@@ -18,6 +18,11 @@ on:
         description: Whether a commit review was requested ('true' or 'false')
         required: false
         default: 'false'
+  secrets:
+    gemini-api-key:
+      required: true
+    github-token:
+      required: true
 
 concurrency:
   group: '${{ github.workflow }}-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
@@ -68,13 +73,13 @@ jobs:
           PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
           REPOSITORY: '${{ github.repository }}'
           ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_API_KEY: '${{ secrets.gemini-api-key }}'
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
           gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          gemini_api_key: '${{ secrets.gemini-api-key }}'
           gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
           gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
           gemini_model: '${{ vars.GEMINI_MODEL }}'
@@ -141,7 +146,7 @@ jobs:
         env:
           GEMINI_OUTPUT: '${{ steps.vulcan-pr-review.outputs.summary }}'
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.github-token }}
           script: |
             const { postPullRequestReview } = require('./.github/workflows/scripts/post-vulcan-review.js');
             return await postPullRequestReview(github, context, core);
@@ -151,7 +156,7 @@ jobs:
         if: ${{ inputs.requested_commit_review == 'true' || steps.review.outputs.should-review-commits == 'true' }}
         uses: 'actions/github-script@v7'
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.github-token }}
           result-encoding: string
           script: |
             const commits = await github.rest.pulls.listCommits({
@@ -195,13 +200,13 @@ jobs:
           COMMIT_SHA: '${{ matrix.commit }}'
           REPOSITORY: '${{ github.repository }}'
           ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_API_KEY: '${{ secrets.gemini-api-key }}'
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
           gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          gemini_api_key: '${{ secrets.gemini-api-key }}'
           gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
           gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
           gemini_model: '${{ vars.GEMINI_MODEL }}'
@@ -265,7 +270,7 @@ jobs:
           COMMIT_SHA: '${{ matrix.commit }}'
           GEMINI_OUTPUT: '${{ steps.vulcan-commit-review.outputs.summary }}'
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.github-token }}
           script: |
             const fs = require('fs');
             const content = process.env.GEMINI_OUTPUT;
@@ -300,7 +305,7 @@ jobs:
         env:
           COMMITS: '${{ needs.review.outputs.commits }}'
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.github-token }}
           script: |
             const { postAggregateCommitReview } = require('./.github/workflows/scripts/post-vulcan-review.js');
             return await postAggregateCommitReview(github, context, core);
