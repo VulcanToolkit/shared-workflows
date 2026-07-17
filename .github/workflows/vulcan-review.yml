@@ -18,11 +18,11 @@ on:
         description: Whether a commit review was requested ('true' or 'false')
         required: false
         default: 'false'
-  secrets:
-    gemini-api-key:
-      required: true
-    github-token:
-      required: true
+    secrets:
+      gemini-api-key:
+        required: true
+      github-token:
+        required: true
 
 concurrency:
   group: '${{ github.workflow }}-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
