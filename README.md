@@ -21,7 +21,7 @@ on:
 
 jobs:
   review:
-    uses: VulcanToolkit/github-action/.github/workflows/vulcan-review.yml@main
+    uses: VulcanToolkit/shared-workflows/.github/workflows/vulcan-review.yml@main
     permissions:
       contents: 'read'
       id-token: 'write'
