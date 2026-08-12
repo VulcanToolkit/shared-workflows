@@ -239,7 +239,7 @@ jobs:
       pull-requests: 'write'
     strategy:
       matrix:
-        commit: ${{ fromJson(needs.review.outputs.commit-hashes) }}
+        commit: ${{ fromJson(needs.start-review.outputs.commit-hashes) }}
         repetition: [1, 2, 3, 4, 5]
     steps:
       - name: Checkout repository
