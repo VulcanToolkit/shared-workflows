@@ -133,7 +133,7 @@ function countVotes(outputs, key) {
     false: 0,
   };
   for (var response of outputs) {
-    const value = response[key].concerning;
+    const value = response[key]?.concerning;
     votes[value]++;
   }
 
@@ -156,7 +156,7 @@ function countVotes(outputs, key) {
 
   // Grab the first valid reason string for each outcome.
   for (var response of outputs) {
-    if (response[key].concerning === majority_decision) {
+    if (response[key]?.concerning === majority_decision) {
       result.reason = result.reason || response[key].reason;
     } else {
       result.dissenting = result.dissenting || response[key].reason;
