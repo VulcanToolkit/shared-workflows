@@ -253,11 +253,12 @@ export async function postAggregateCommitReview(github, context, core) {
     const conclusively_vague = (result.vagueness.concerning && result.vagueness.conclusive);
     if (conclusively_vague) {
       details += vagueCommitReport(result, hash, url, message, index);
+      table += `| ${index} | ${message.subject} [${hash}](${url}) | ${result.vagueness.result_string} | - | - |\n`;
     } else {
       details += nonvagueCommitReport(result, hash, url, message, index);
+      table += `| ${index} | ${message.subject} [${hash}](${url}) | ${result.vagueness.result_string} | ${result.contradicting.result_string} | ${result.incomplete.result_string} |\n`;
     }
 
-    table += `| ${index} | ${message.subject} [${hash}](${url}) | ${result.vagueness.result_string} | ${result.contradicting.result_string} | ${result.incomplete.result_string} |\n`;
     index++;
   }
 
