@@ -17,7 +17,7 @@ const reasonInconclusive = (response, type) => `*Majority:* ${response[type].rea
 const reasonSection = (response, type) => response[type].conclusive ? reasonConclusive(response, type) : reasonInconclusive(response, type);
 
 // Template for the summary line at the end of a PR review.
-const summaryLine = (respose) => {
+const summaryLine = (response) => {
   if (response.vagueness.concerning && response.vagueness.conclusive) {
     return "Code consistency could not be evaluated because the commit message was too vague. A review of the individual commits will be conducted.";
   }
