@@ -186,7 +186,7 @@ jobs:
             fs.writeFileSync(`vulcan-pr-${process.env.REPETITION}.txt`, content);
 
       - name: Create review artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vulcan-pr-${{ matrix.repetition }}
           path: vulcan-pr-${{ matrix.repetition }}.txt
@@ -334,7 +334,7 @@ jobs:
             fs.writeFileSync(`vulcan-commit-${process.env.COMMIT_SHA}-${process.env.REPETITION}.txt`, content);
 
       - name: Create review artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}
           path: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}.txt
