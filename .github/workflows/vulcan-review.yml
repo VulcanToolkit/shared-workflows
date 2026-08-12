@@ -33,7 +33,7 @@ defaults:
     shell: 'bash'
 
 jobs:
-  review:
+  start-review:
     runs-on: 'ubuntu-latest'
     timeout-minutes: 30
     permissions:
@@ -44,7 +44,6 @@ jobs:
     outputs:
       commits: ${{ steps.get-pr-commits.outputs.commits }}
       commit-hashes: ${{ steps.get-pr-commits.outputs.commit-hashes }}
-      should-review-commits: ${{ steps.post-comment.outputs.should-review-commits }}
       token: ${{ steps.mint-identity-token.outputs.token }}
     steps:
       - name: Mint identity token
@@ -68,12 +67,40 @@ jobs:
           repository: VulcanToolkit/shared-workflows
           path: shared-workflows
 
+      - name: Get PR Commits
+        id: get-pr-commits
+        if: ${{ inputs.requested_commit_review == 'true' || steps.review.outputs.should-review-commits == 'true' }}
+        uses: 'actions/github-script@v7'
+        with:
+          github-token: ${{ secrets.github-token }}
+          result-encoding: string
+          script: |
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
+            });
+
+            // List of hashes for the matrix strategy
+            core.setOutput("commit-hashes", JSON.stringify(commits.data.map(x => x.sha)))
+
+            // Map of hash to commit information for reporting
+            const commit_map = Object.fromEntries(commits.data.map(x => [x.sha, x]));
+            core.setOutput("commits", JSON.stringify(commit_map))
+
+  pr-review:
+    needs: start-review
+    if: ${{ inputs.requested_pr_review == 'true' }}
+    strategy:
+      matrix:
+        repetition: [1, 2, 3, 4, 5]
+    steps:
       - name: Run Vulcan pull request review
         id: vulcan-pr-review
         uses: 'google-github-actions/run-gemini-cli@v0.1.21' # ratchet:exclude
         if: ${{ inputs.requested_pr_review == 'true' }}
         env:
-          GITHUB_TOKEN: '${{ steps.mint-identity-token.outputs.token || secrets.github-token || github.token }}'
+          GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
           ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
           PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
@@ -145,42 +172,63 @@ jobs:
             ]
           prompt: '/vulcan-review-pr'
 
+      - name: Save output
+        uses: actions/github-script@v7
+        id: save-outputs
+        env:
+          REPETITION: '${{ matrix.repetition }}'
+          GEMINI_OUTPUT: '${{ steps.vulcan-pr-review.outputs.summary }}'
+        with:
+          github-token: ${{ secrets.github-token }}
+          script: |
+            const fs = require('fs');
+            const content = process.env.GEMINI_OUTPUT;
+            fs.writeFileSync(`vulcan-pr-${process.env.REPETITION}.txt`, content);
+
+      - name: Create review artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulcan-pr-${{ matrix.repetition }}
+          path: vulcan-pr-${{ matrix.repetition }}.txt
+
+  finish-pr-review:
+    needs: pr-review
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 30
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+      issues: 'write'
+      pull-requests: 'write'
+    outputs:
+      should-review-commits: ${{ steps.post-comment.outputs.should-review-commits }}
+    steps:
+      - name: Checkout repository
+        uses: 'actions/checkout@v7'
+
+      - name: Checkout shared-workflows repository
+        uses: 'actions/checkout@v7'
+        with:
+          repository: VulcanToolkit/shared-workflows
+          path: shared-workflows
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vulcan-pr-*
+          merge-multiple: true
+
       - name: Post Comment
         id: post-comment
-        if: ${{ inputs.requested_pr_review == 'true' }}
         uses: actions/github-script@v7
-        env:
-          GEMINI_OUTPUT: '${{ steps.vulcan-pr-review.outputs.summary }}'
         with:
           github-token: ${{ secrets.github-token }}
           script: |
             const { postPullRequestReview } = require('./shared-workflows/scripts/post-vulcan-review.js');
             return await postPullRequestReview(github, context, core);
 
-      - name: Get PR Commits
-        id: get-pr-commits
-        if: ${{ inputs.requested_commit_review == 'true' || steps.review.outputs.should-review-commits == 'true' }}
-        uses: 'actions/github-script@v7'
-        with:
-          github-token: ${{ secrets.github-token }}
-          result-encoding: string
-          script: |
-            const commits = await github.rest.pulls.listCommits({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
-            });
-
-            // List of hashes for the matrix strategy
-            core.setOutput("commit-hashes", JSON.stringify(commits.data.map(x => x.sha)))
-
-            // Map of hash to commit information for reporting
-            const commit_map = Object.fromEntries(commits.data.map(x => [x.sha, x]));
-            core.setOutput("commits", JSON.stringify(commit_map))
-
-  per-commit-review:
-    needs: review
-    if: ${{ inputs.requested_commit_review == 'true' || needs.review.outputs.should-review-commits == 'true' }}
+  commit-review:
+    needs: [start-review, pr-review]
+    if: ${{ inputs.requested_commit_review == 'true' || needs.pr-review.outputs.should-review-commits == 'true' }}
     runs-on: 'ubuntu-latest'
     timeout-minutes: 30
     permissions:
@@ -191,6 +239,7 @@ jobs:
     strategy:
       matrix:
         commit: ${{ fromJson(needs.review.outputs.commit-hashes) }}
+        repetition: [1, 2, 3, 4, 5]
     steps:
       - name: Checkout repository
         uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8' # ratchet:actions/checkout@v6
@@ -201,7 +250,7 @@ jobs:
         id: vulcan-commit-review
         uses: 'google-github-actions/run-gemini-cli@v0.1.21' # ratchet:exclude
         env:
-          GITHUB_TOKEN: '${{ needs.review.outputs.token || secrets.github-token || github.token }}'
+          GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
           COMMIT_MESSAGE: '${{ fromJson(needs.review.outputs.commits)[matrix.commit].commit.message }}'
           COMMIT_SHA: '${{ matrix.commit }}'
           REPOSITORY: '${{ github.repository }}'
@@ -269,27 +318,28 @@ jobs:
             ]
           prompt: '/vulcan-review-commit'
 
-      - name: Post Comment
+      - name: Save output
         uses: actions/github-script@v7
-        id: collect-outputs
+        id: save-outputs
         env:
           COMMIT_SHA: '${{ matrix.commit }}'
+          REPETITION: '${{ matrix.repetition }}'
           GEMINI_OUTPUT: '${{ steps.vulcan-commit-review.outputs.summary }}'
         with:
           github-token: ${{ secrets.github-token }}
           script: |
             const fs = require('fs');
             const content = process.env.GEMINI_OUTPUT;
-            fs.writeFileSync(`vulcan-review-${process.env.COMMIT_SHA}.txt`, content);
+            fs.writeFileSync(`vulcan-commit-${process.env.COMMIT_SHA}-${process.env.REPETITION}.txt`, content);
 
       - name: Create review artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vulcan-review-${{ matrix.commit }}
-          path: vulcan-review-${{ matrix.commit }}.txt
+          name: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}
+          path: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}.txt
 
-  finish-per-commit-review:
-    needs: [review, per-commit-review]
+  finish-commit-review:
+    needs: [start-review, commit-review]
     runs-on: 'ubuntu-latest'
     timeout-minutes: 30
     permissions:
@@ -309,13 +359,13 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          pattern: vulcan-review-*
+          pattern: vulcan-commit-*
           merge-multiple: true
 
       - name: Post Comment
         uses: actions/github-script@v7
         env:
-          COMMITS: '${{ needs.review.outputs.commits }}'
+          COMMITS: '${{ needs.start-review.outputs.commits }}'
         with:
           github-token: ${{ secrets.github-token }}
           script: |
