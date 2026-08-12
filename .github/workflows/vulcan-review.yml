@@ -90,6 +90,8 @@ jobs:
 
   pr-review:
     needs: start-review
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 30
     if: ${{ inputs.requested_pr_review == 'true' }}
     strategy:
       matrix:
