@@ -229,8 +229,8 @@ jobs:
             return await postPullRequestReview(github, context, core);
 
   commit-review:
-    needs: [start-review, pr-review]
-    if: ${{ inputs.requested_commit_review == 'true' || needs.pr-review.outputs.should-review-commits == 'true' }}
+    needs: [start-review, finish-pr-review]
+    if: ${{ inputs.requested_commit_review == 'true' || needs.finish-pr-review.outputs.should-review-commits == 'true' }}
     runs-on: 'ubuntu-latest'
     timeout-minutes: 30
     permissions:

@@ -146,7 +146,7 @@ function countVotes(outputs, key) {
     result_string: majority_decision ? "concerning" : "OK",
     votes: votes[majority_decision],
     total_votes: votes[true] + votes[false],
-    conclusive: (votes[majority_decision] >= super_majority_threshold,
+    conclusive: (votes[majority_decision] >= super_majority_threshold),
     reason: null,
     dissenting: null,
   };
@@ -198,7 +198,7 @@ export async function postPullRequestReview(github, context, core) {
     } catch (error) {
       console.warn(error);
     }
-  );
+  });
   const result = mergeOutputs(outputs);
 
   var comment;
@@ -244,7 +244,7 @@ export async function postAggregateCommitReview(github, context, core) {
       } catch (error) {
         console.warn(error);
       }
-    );
+    });
     const result = mergeOutputs(outputs);
 
     const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${issueNumber}/changes/${hash}`
