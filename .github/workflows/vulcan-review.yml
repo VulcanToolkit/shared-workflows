@@ -69,7 +69,7 @@ jobs:
 
       - name: Get PR Commits
         id: get-pr-commits
-        uses: 'actions/github-script@v7'
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.github-token }}
           result-encoding: string
@@ -173,7 +173,7 @@ jobs:
           prompt: '/vulcan-review-pr'
 
       - name: Save output
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: save-outputs
         env:
           REPETITION: '${{ matrix.repetition }}'
@@ -219,7 +219,7 @@ jobs:
 
       - name: Post Comment
         id: post-comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.github-token }}
           script: |
@@ -320,7 +320,7 @@ jobs:
           prompt: '/vulcan-review-commit'
 
       - name: Save output
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: save-outputs
         env:
           COMMIT_SHA: '${{ matrix.commit }}'
@@ -364,7 +364,7 @@ jobs:
           merge-multiple: true
 
       - name: Post Comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           COMMITS: '${{ needs.start-review.outputs.commits }}'
         with:
