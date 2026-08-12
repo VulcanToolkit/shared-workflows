@@ -252,7 +252,7 @@ jobs:
         uses: 'google-github-actions/run-gemini-cli@v0.1.21' # ratchet:exclude
         env:
           GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
-          COMMIT_MESSAGE: '${{ fromJson(needs.review.outputs.commits)[matrix.commit].commit.message }}'
+          COMMIT_MESSAGE: '${{ fromJson(needs.start-review.outputs.commits)[matrix.commit].commit.message }}'
           COMMIT_SHA: '${{ matrix.commit }}'
           REPOSITORY: '${{ github.repository }}'
           ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
