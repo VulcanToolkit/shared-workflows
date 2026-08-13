@@ -7,13 +7,13 @@ const super_majority_threshold = 4;
 
 // Template for the consistency check header line.
 // Example: "concerning (4 / 5)"
-const consistencyHeader = (response, type) => `${response[type].result_string} (${response[type].votes} / ${response[type].total_votes})`;
+const consistencyHeader = (response, type) => `${response[type].result_string} (${response[type].votes} / ${response[type].total_votes} votes)`;
 
 // Templates for the reason section.
 const reasonConclusive = (response, type) => response[type].reason;
 const reasonInconclusive = (response, type) => `*Majority:* ${response[type].reason}
 
-  *Dissenting:* ${response[type].dissenting}`;
+   *Dissenting:* ${response[type].dissenting}`;
 const reasonSection = (response, type) => response[type].conclusive ? reasonConclusive(response, type) : reasonInconclusive(response, type);
 
 // Template for the summary line at the end of a PR review.
@@ -151,7 +151,8 @@ function countVotes(outputs, key) {
     dissenting: null,
   };
   if (!result.conclusive) {
-    result.result_string = "inconclusive";
+    // Add a question mark uncertainty symbol for inconclusive results.
+    result.result_string = result.result_string + '\u2BD1';
   }
 
   // Grab the first valid reason string for each outcome.
