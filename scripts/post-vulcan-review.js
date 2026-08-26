@@ -263,7 +263,7 @@ export async function postAggregateCommitReview(github, context, core) {
       }
     });
     const result = mergeOutputs(outputs);
-    allCommitResults.push();
+    allCommitResults.push(result);
 
     const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${issueNumber}/changes/${hash}`
     const message = splitCommitMessage(commit.commit.message);
