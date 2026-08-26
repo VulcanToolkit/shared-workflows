@@ -1,7 +1,6 @@
 import fs from 'fs';
 
 const vulcan_project_url = 'https://github.com/VulcanToolkit';
-const num_repetitions = 5;
 const super_majority_threshold = 4;
 
 
@@ -58,14 +57,6 @@ const nonvagueReport = (response) => `# [Vulcan](${vulcan_project_url}) Pull Req
 ${summaryLine(response)}`;
 
 
-// Template: pull request review, error parsing model output
-const parseErrorReport = (response) => `# [Vulcan](${vulcan_project_url}) Pull Request Review
-
-${response}
-
-Note: an error occurred while parsing the report. A review of the individual commits will be conducted.`;
-
-
 // Template: commit review, positive for vagueness
 const vagueCommitReport = (response, hash, url, message, index) => `
 ## ${index}. [${message.subject}](${url})
@@ -92,16 +83,6 @@ ${message.body === "" ? "*Commit message has no further details*\n\n" : "<blockq
 3. **Incomplete:** ${consistencyHeader(response, "incomplete")}
 
    ${reasonSection(response, "incomplete")}`;
-
-
-// Template: commit review, error parsing model output
-const parseErrorReportCommit = (response, hash, url, message, index) => `
-## ${index}. [${message.subject}](${url})
-${message.body === "" ? "*Commit message has no further details*\n\n" : "<blockquote>" + message.body + "</blockquote>"}
-
-${response}
-
-Note: an error occurred while parsing the report. The formatting may be incorrect, but the contents may still be helpful.`;
 
 
 // Parse JSON output from model
@@ -132,7 +113,7 @@ function countVotes(outputs, key) {
     true: 0,
     false: 0,
   };
-  for (var response of outputs) {
+  for (let response of outputs) {
     const value = response[key]?.concerning;
     votes[value]++;
   }
@@ -156,7 +137,7 @@ function countVotes(outputs, key) {
   }
 
   // Grab the first valid reason string for each outcome.
-  for (var response of outputs) {
+  for (let response of outputs) {
     if (response[key]?.concerning === majority_decision) {
       result.reason = result.reason || response[key].reason;
     } else {
@@ -237,7 +218,7 @@ function createSummaryLine(commitResults) {
   }
 
   const numCommits = formatCount(commitResults.length, 'commit', 'commits');
-  var summaryLine = '';
+  var summaryLine;
   if (present.length === 0) {
     summaryLine = `All ${numCommits} passed all code consistency checks.`;
   } else if (present.length === 1) {
@@ -299,7 +280,7 @@ export async function postAggregateCommitReview(github, context, core) {
     index++;
   }
 
-  const summary = generateSummaryLine(allCommitResults);
+  const summary = createSummaryLine(allCommitResults);
   const comment = `# [Vulcan](${vulcan_project_url}) Commit Review\n\n${summary}\n\n${table}\n\n${details}`;
 
   await github.rest.issues.createComment({
