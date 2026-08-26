@@ -219,6 +219,39 @@ export async function postPullRequestReview(github, context, core) {
   });
 }
 
+function formatCount(count, singular, plural) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function createSummaryLine(commitResults) {
+  const inconsistencies = ['vagueness', 'contradicting', 'incomplete'];
+
+  const counts = {};
+  const present = [];
+  for (var inconsistency of inconsistencies) {
+    counts[inconsistency] = commitResults.reduce((count, result) => {
+      return result[inconsistency]?.concerning ? count+1 : count;
+    }, 0);
+    if (counts[inconsistency] > 0)
+      present.push(inconsistency);
+  }
+
+  const numCommits = formatCount(commitResults.length, 'commit', 'commits');
+  var summaryLine = '';
+  if (present.length === 0) {
+    summaryLine = `All ${numCommits} passed all code consistency checks.`;
+  } else if (present.length === 1) {
+    summaryLine = `Of the ${numCommits}, the consistency checks identified ${counts[present[0]]} with ${present[0]} concerns.`;
+  } else if (present.length === 2) {
+    summaryLine = `Of the ${numCommits}, the consistency checks identified ${counts[present[0]]} with ${present[0]} concerns and ${counts[present[1]]} with ${present[1]} concerns.`;
+  } else {
+    summaryLine = `Of the ${numCommits}, the consistency checks identified ${counts[present[0]]} with ${present[0]} concerns, ${counts[present[1]]} with ${present[1]} concerns, and ${counts[present[2]]} with ${present[2]} concerns.`;
+  }
+
+  summaryLine += ' The table below shows the test results for each commit.';
+  return summaryLine;
+}
+
 export async function postAggregateCommitReview(github, context, core) {
   const issueNumber = context.payload.pull_request
     ? context.payload.pull_request.number
@@ -236,6 +269,8 @@ export async function postAggregateCommitReview(github, context, core) {
 
   var details = "";
 
+  const allCommitResults = [];
+
   var index = 1;
   for (const [hash, commit] of Object.entries(commits)) {
     const outputs = [1, 2, 3, 4, 5].map(i => {
@@ -247,6 +282,7 @@ export async function postAggregateCommitReview(github, context, core) {
       }
     });
     const result = mergeOutputs(outputs);
+    allCommitResults.push();
 
     const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${issueNumber}/changes/${hash}`
     const message = splitCommitMessage(commit.commit.message);
@@ -263,7 +299,8 @@ export async function postAggregateCommitReview(github, context, core) {
     index++;
   }
 
-  const comment = `# [Vulcan](${vulcan_project_url}) Commit Review\n\n${table}\n\n${details}`;
+  const summary = generateSummaryLine(allCommitResults);
+  const comment = `# [Vulcan](${vulcan_project_url}) Commit Review\n\n${summary}\n\n${table}\n\n${details}`;
 
   await github.rest.issues.createComment({
     owner: context.repo.owner,
