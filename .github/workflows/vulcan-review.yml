@@ -184,10 +184,18 @@ jobs:
             fs.writeFileSync(`vulcan-pr-${process.env.REPETITION}.txt`, content);
 
       - name: Create review artifacts
+        id: upload-artifact
         uses: actions/upload-artifact@v7
         with:
           name: vulcan-pr-${{ matrix.repetition }}
           path: vulcan-pr-${{ matrix.repetition }}.txt
+
+      - name: Post to report-generation service
+        run: |
+          issue_num="${{ github.event.pull_request.number || github.event.issue.number }}"
+          run_id="${{ github.run_id }}"
+          artifact_id="${{ steps.upload-artifact.outputs.artifact-id }}"
+          curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?issue_num=$issue_num&run_id=$run_id&artifact_id=$artifact_id"
 
   finish-pr-review:
     needs: pr-review
@@ -332,10 +340,18 @@ jobs:
             fs.writeFileSync(`vulcan-commit-${process.env.COMMIT_SHA}-${process.env.REPETITION}.txt`, content);
 
       - name: Create review artifacts
+        id: upload-artifact
         uses: actions/upload-artifact@v7
         with:
           name: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}
           path: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}.txt
+
+      - name: Post to report-generation service
+        run: |
+          issue_num="${{ github.event.pull_request.number || github.event.issue.number }}"
+          run_id="${{ github.run_id }}"
+          artifact_id="${{ steps.upload-artifact.outputs.artifact-id }}"
+          curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?issue_num=$issue_num&run_id=$run_id&artifact_id=$artifact_id"
 
   finish-commit-review:
     needs: [start-review, commit-review]
