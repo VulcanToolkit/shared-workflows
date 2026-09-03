@@ -192,13 +192,16 @@ jobs:
 
       - name: Post to report-generation service
         run: |
+          repo_owner="${{ github.repository_owner }}"
+          repo_name="${{ github.event.repository.name }}"
           issue_num="${{ github.event.pull_request.number || github.event.issue.number }}"
           run_id="${{ github.run_id }}"
           artifact_id="${{ steps.upload-artifact.outputs.artifact-id }}"
-          curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?issue_num=$issue_num&run_id=$run_id&artifact_id=$artifact_id"
+          args="repo_owner=$repo_owner&repo_name=$repo_name&issue_num=$issue_num&run_id=$run_id&artifact_id=$artifact_id"
+          curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
 
   finish-pr-review:
-    needs: pr-review
+    needs: [start-review, pr-review]
     runs-on: 'ubuntu-latest'
     timeout-minutes: 30
     permissions:
@@ -231,6 +234,21 @@ jobs:
           script: |
             const { postPullRequestReview } = require('./shared-workflows/scripts/post-vulcan-review.js');
             return await postPullRequestReview(github, context, core);
+
+      - name: Fetch PR review report
+        id: fetch-pr-report
+        env:
+          GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
+          REPOSITORY: '${{ github.repository }}'
+          ISSUE_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+        run: |
+          repo_owner="${{ github.repository_owner }}"
+          repo_name="${{ github.event.repository.name }}"
+          issue_num="${{ github.event.pull_request.number || github.event.issue.number }}"
+          run_id="${{ github.run_id }}"
+          args="repo_owner=$repo_owner&repo_name=$repo_name&issue_num=$issue_num&run_id=$run_id"
+          report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make-pr-report?$args")
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPOSITORY" --body "$report"
 
   commit-review:
     needs: [start-review, finish-pr-review]
@@ -348,10 +366,13 @@ jobs:
 
       - name: Post to report-generation service
         run: |
+          repo_owner="${{ github.repository_owner }}"
+          repo_name="${{ github.event.repository.name }}"
           issue_num="${{ github.event.pull_request.number || github.event.issue.number }}"
           run_id="${{ github.run_id }}"
           artifact_id="${{ steps.upload-artifact.outputs.artifact-id }}"
-          curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?issue_num=$issue_num&run_id=$run_id&artifact_id=$artifact_id"
+          args="repo_owner=$repo_owner&repo_name=$repo_name&issue_num=$issue_num&run_id=$run_id&artifact_id=$artifact_id"
+          curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
 
   finish-commit-review:
     needs: [start-review, commit-review]
