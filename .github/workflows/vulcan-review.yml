@@ -211,31 +211,8 @@ jobs:
       issues: 'write'
       pull-requests: 'write'
     outputs:
-      should-review-commits: ${{ steps.post-comment.outputs.should-review-commits }}
+      should-review-commits: ${{ steps.fetch-pr-report.outputs.should-review-commits }}
     steps:
-      - name: Checkout repository
-        uses: 'actions/checkout@v7'
-
-      - name: Checkout shared-workflows repository
-        uses: 'actions/checkout@v7'
-        with:
-          repository: VulcanToolkit/shared-workflows
-          path: shared-workflows
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: vulcan-pr-*
-          merge-multiple: true
-
-      - name: Post Comment
-        id: post-comment
-        uses: actions/github-script@v9
-        with:
-          github-token: ${{ secrets.github-token }}
-          script: |
-            const { postPullRequestReview } = require('./shared-workflows/scripts/post-vulcan-review.js');
-            return await postPullRequestReview(github, context, core);
-
       - name: Fetch PR review report
         id: fetch-pr-report
         env:
@@ -249,6 +226,12 @@ jobs:
           args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&issue_num=$ISSUE_NUM&run_id=$RUN_ID"
           report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_pr_report?$args")
           gh issue comment "$ISSUE_NUM" --repo "$REPOSITORY" --body "$report"
+
+          if [[ "$report" == *"A review of the individual commits will be conducted."* ]]; then
+            echo "should-review-commits=true" >>$GITHUB_OUTPUT
+          else
+            echo "should-review-commits=false" >>$GITHUB_OUTPUT
+          fi
 
   commit-review:
     needs: [start-review, finish-pr-review]
@@ -387,30 +370,6 @@ jobs:
       issues: 'write'
       pull-requests: 'write'
     steps:
-      - name: Checkout repository
-        uses: 'actions/checkout@v7'
-
-      - name: Checkout shared-workflows repository
-        uses: 'actions/checkout@v7'
-        with:
-          repository: VulcanToolkit/shared-workflows
-          path: shared-workflows
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: vulcan-commit-*
-          merge-multiple: true
-
-      - name: Post Comment
-        uses: actions/github-script@v9
-        env:
-          COMMITS: '${{ needs.start-review.outputs.commits }}'
-        with:
-          github-token: ${{ secrets.github-token }}
-          script: |
-            const { postAggregateCommitReview } = require('./shared-workflows/scripts/post-vulcan-review.js');
-            return await postAggregateCommitReview(github, context, core);
-
       - name: Fetch commit review report
         id: fetch-commit-report
         env:
