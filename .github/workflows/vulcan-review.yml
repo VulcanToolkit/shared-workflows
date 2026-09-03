@@ -247,7 +247,7 @@ jobs:
           issue_num="${{ github.event.pull_request.number || github.event.issue.number }}"
           run_id="${{ github.run_id }}"
           args="repo_owner=$repo_owner&repo_name=$repo_name&issue_num=$issue_num&run_id=$run_id"
-          report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make-pr-report?$args")
+          report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_pr_report?$args")
           gh issue comment "$ISSUE_NUMBER" --repo "$REPOSITORY" --body "$report"
 
   commit-review:
