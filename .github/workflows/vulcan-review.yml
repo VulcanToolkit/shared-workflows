@@ -194,11 +194,11 @@ jobs:
         env:
           REPO_OWNER: "${{ github.repository_owner }}"
           REPO_NAME: "${{ github.event.repository.name }}"
-          ISSUE_NUM: "${{ github.event.pull_request.number || github.event.issue.number }}"
+          PULL_NUM: "${{ github.event.pull_request.number || github.event.issue.number }}"
           RUN_ID: "${{ github.run_id }}"
           ARTIFACT_ID: "${{ steps.upload-artifact.outputs.artifact-id }}"
         run: |
-          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&issue_num=$ISSUE_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
+          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
           curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
 
   finish-pr-review:
@@ -218,14 +218,14 @@ jobs:
         env:
           GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
           REPOSITORY: '${{ github.repository }}'
-          ISSUE_NUM: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          PULL_NUM: '${{ github.event.pull_request.number || github.event.issue.number }}'
           REPO_OWNER: "${{ github.repository_owner }}"
           REPO_NAME: "${{ github.event.repository.name }}"
           RUN_ID: "${{ github.run_id }}"
         run: |
-          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&issue_num=$ISSUE_NUM&run_id=$RUN_ID"
+          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
           report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_pr_report?$args")
-          gh issue comment "$ISSUE_NUM" --repo "$REPOSITORY" --body "$report"
+          gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
 
           if [[ "$report" == *"A review of the individual commits will be conducted."* ]]; then
             echo "should-review-commits=true" >>$GITHUB_OUTPUT
@@ -351,11 +351,11 @@ jobs:
         env:
           REPO_OWNER: "${{ github.repository_owner }}"
           REPO_NAME: "${{ github.event.repository.name }}"
-          ISSUE_NUM: "${{ github.event.pull_request.number || github.event.issue.number }}"
+          PULL_NUM: "${{ github.event.pull_request.number || github.event.issue.number }}"
           RUN_ID: "${{ github.run_id }}"
           ARTIFACT_ID: "${{ steps.upload-artifact.outputs.artifact-id }}"
         run: |
-          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&issue_num=$ISSUE_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
+          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
           curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
 
   finish-commit-review:
@@ -375,11 +375,11 @@ jobs:
         env:
           GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
           REPOSITORY: '${{ github.repository }}'
-          ISSUE_NUM: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          PULL_NUM: '${{ github.event.pull_request.number || github.event.issue.number }}'
           REPO_OWNER: "${{ github.repository_owner }}"
           REPO_NAME: "${{ github.event.repository.name }}"
           RUN_ID: "${{ github.run_id }}"
         run: |
-          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&issue_num=$ISSUE_NUM&run_id=$RUN_ID"
+          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
           report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_commit_report?$args")
-          gh issue comment "$ISSUE_NUM" --repo "$REPOSITORY" --body "$report"
+          gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
