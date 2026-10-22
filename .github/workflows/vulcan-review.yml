@@ -61,12 +61,8 @@ jobs:
 
             - name: Checkout repository
               uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-
-            - name: Checkout shared-workflows repository
-              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
               with:
-                  repository: VulcanToolkit/shared-workflows
-                  path: shared-workflows
+                  ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/head
 
             - name: Get PR Commits
               id: get-pr-commits
