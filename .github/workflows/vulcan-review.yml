@@ -60,17 +60,17 @@ jobs:
                   permission-pull-requests: write
 
             - name: Checkout repository
-              uses: actions/checkout@v7
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
 
             - name: Checkout shared-workflows repository
-              uses: actions/checkout@v7
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
               with:
                   repository: VulcanToolkit/shared-workflows
                   path: shared-workflows
 
             - name: Get PR Commits
               id: get-pr-commits
-              uses: actions/github-script@v9
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # ratchet:actions/github-script@v9
               with:
                   github-token: ${{ secrets.github-token }}
                   result-encoding: string
@@ -99,7 +99,7 @@ jobs:
         steps:
             - name: Run Vulcan pull request review
               id: vulcan-pr-review
-              uses: google-github-actions/run-gemini-cli@v0.1.21 # ratchet:exclude
+              uses: google-github-actions/run-gemini-cli@9dbec29a20fab3f35017a40ad0eb798a257d4d51 # ratchet:google-github-actions/run-gemini-cli@v0.1.21
               env:
                   GITHUB_TOKEN: ${{ needs.start-review.outputs.token || secrets.github-token || github.token }}
                   ISSUE_TITLE: ${{ github.event.pull_request.title || github.event.issue.title }}
@@ -172,7 +172,7 @@ jobs:
                   prompt: /vulcan-review-pr
 
             - name: Save output
-              uses: actions/github-script@v9
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # ratchet:actions/github-script@v9
               id: save-outputs
               env:
                   REPETITION: ${{ matrix.repetition }}
@@ -186,7 +186,7 @@ jobs:
 
             - name: Create review artifacts
               id: upload-artifact
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # ratchet:actions/upload-artifact@v7
               with:
                   name: vulcan-pr-${{ matrix.repetition }}
                   path: vulcan-pr-${{ matrix.repetition }}.txt
@@ -257,7 +257,7 @@ jobs:
 
             - name: Run Vulcan commit review
               id: vulcan-commit-review
-              uses: google-github-actions/run-gemini-cli@v0.1.21 # ratchet:exclude
+              uses: google-github-actions/run-gemini-cli@9dbec29a20fab3f35017a40ad0eb798a257d4d51 # ratchet:google-github-actions/run-gemini-cli@v0.1.21
               env:
                   GITHUB_TOKEN: ${{ needs.start-review.outputs.token || secrets.github-token || github.token }}
                   COMMIT_MESSAGE: ${{ fromJson(needs.start-review.outputs.commits)[matrix.commit].commit.message }}
@@ -328,7 +328,7 @@ jobs:
                   prompt: /vulcan-review-commit
 
             - name: Save output
-              uses: actions/github-script@v9
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # ratchet:actions/github-script@v9
               id: save-outputs
               env:
                   COMMIT_SHA: ${{ matrix.commit }}
@@ -343,7 +343,7 @@ jobs:
 
             - name: Create review artifacts
               id: upload-artifact
-              uses: actions/upload-artifact@v7
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # ratchet:actions/upload-artifact@v7
               with:
                   name: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}
                   path: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}.txt
