@@ -1,385 +1,386 @@
-name: '🔎 Vulcan Review'
+---
+name: 🔎 Vulcan Review
 description: Review PR and commit code for consistency
 
 on:
-  workflow_call:
-    inputs:
-      additional_context:
-        type: 'string'
-        description: Any additional context from the request
-        required: false
-      requested_pr_review:
-        type: 'string'
-        description: Whether a pull request review was requested ('true' or 'false')
-        required: false
-        default: 'true'
-      requested_commit_review:
-        type: 'string'
-        description: Whether a commit review was requested ('true' or 'false')
-        required: false
-        default: 'false'
-    secrets:
-      gemini-api-key:
-        required: true
-      github-token:
-        required: true
+    workflow_call:
+        inputs:
+            additional_context:
+                type: string
+                description: Any additional context from the request
+                required: false
+            requested_pr_review:
+                type: string
+                description: Whether a pull request review was requested ('true' or 'false')
+                required: false
+                default: 'true'
+            requested_commit_review:
+                type: string
+                description: Whether a commit review was requested ('true' or 'false')
+                required: false
+                default: 'false'
+        secrets:
+            gemini-api-key:
+                required: true
+            github-token:
+                required: true
 
 concurrency:
-  group: '${{ github.workflow }}-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}
+    cancel-in-progress: true
 
 defaults:
-  run:
-    shell: 'bash'
+    run:
+        shell: bash
 
 jobs:
-  start-review:
-    runs-on: 'ubuntu-latest'
-    timeout-minutes: 30
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-      issues: 'write'
-      pull-requests: 'write'
-    outputs:
-      commits: ${{ steps.get-pr-commits.outputs.commits }}
-      commit-hashes: ${{ steps.get-pr-commits.outputs.commit-hashes }}
-      token: ${{ steps.mint-identity-token.outputs.token }}
-    steps:
-      - name: Mint identity token
-        id: mint-identity-token
-        if: |-
-          ${{ vars.APP_ID }}
-        uses: 'actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf' # ratchet:actions/create-github-app-token@v2
-        with:
-          app-id: '${{ vars.APP_ID }}'
-          private-key: '${{ secrets.APP_PRIVATE_KEY }}'
-          permission-contents: 'read'
-          permission-issues: 'write'
-          permission-pull-requests: 'write'
+    start-review:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        permissions:
+            contents: read
+            id-token: write
+            issues: write
+            pull-requests: write
+        outputs:
+            commits: ${{ steps.get-pr-commits.outputs.commits }}
+            commit-hashes: ${{ steps.get-pr-commits.outputs.commit-hashes }}
+            token: ${{ steps.mint-identity-token.outputs.token }}
+        steps:
+            - name: Mint identity token
+              id: mint-identity-token
+              if: |-
+                  ${{ vars.APP_ID }}
+              uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # ratchet:actions/create-github-app-token@v2
+              with:
+                  app-id: ${{ vars.APP_ID }}
+                  private-key: ${{ secrets.APP_PRIVATE_KEY }}
+                  permission-contents: read
+                  permission-issues: write
+                  permission-pull-requests: write
 
-      - name: Checkout repository
-        uses: 'actions/checkout@v7'
+            - name: Checkout repository
+              uses: actions/checkout@v7
 
-      - name: Checkout shared-workflows repository
-        uses: 'actions/checkout@v7'
-        with:
-          repository: VulcanToolkit/shared-workflows
-          path: shared-workflows
+            - name: Checkout shared-workflows repository
+              uses: actions/checkout@v7
+              with:
+                  repository: VulcanToolkit/shared-workflows
+                  path: shared-workflows
 
-      - name: Get PR Commits
-        id: get-pr-commits
-        uses: actions/github-script@v9
-        with:
-          github-token: ${{ secrets.github-token }}
-          result-encoding: string
-          script: |
-            const commits = await github.rest.pulls.listCommits({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
-            });
+            - name: Get PR Commits
+              id: get-pr-commits
+              uses: actions/github-script@v9
+              with:
+                  github-token: ${{ secrets.github-token }}
+                  result-encoding: string
+                  script: |
+                      const commits = await github.rest.pulls.listCommits({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
+                      });
 
-            // List of hashes for the matrix strategy
-            core.setOutput("commit-hashes", JSON.stringify(commits.data.map(x => x.sha)))
+                      // List of hashes for the matrix strategy
+                      core.setOutput("commit-hashes", JSON.stringify(commits.data.map(x => x.sha)))
 
-            // Map of hash to commit information for reporting
-            const commit_map = Object.fromEntries(commits.data.map(x => [x.sha, x]));
-            core.setOutput("commits", JSON.stringify(commit_map))
+                      // Map of hash to commit information for reporting
+                      const commit_map = Object.fromEntries(commits.data.map(x => [x.sha, x]));
+                      core.setOutput("commits", JSON.stringify(commit_map))
 
-  pr-review:
-    needs: start-review
-    runs-on: 'ubuntu-latest'
-    timeout-minutes: 30
-    if: ${{ inputs.requested_pr_review == 'true' }}
-    strategy:
-      matrix:
-        repetition: [1, 2, 3, 4, 5]
-    steps:
-      - name: Run Vulcan pull request review
-        id: vulcan-pr-review
-        uses: 'google-github-actions/run-gemini-cli@v0.1.21' # ratchet:exclude
-        env:
-          GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
-          ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
-          ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
-          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          REPOSITORY: '${{ github.repository }}'
-          ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
-          GEMINI_API_KEY: '${{ secrets.gemini-api-key }}'
-        with:
-          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
-          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          gemini_api_key: '${{ secrets.gemini-api-key }}'
-          gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
-          gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
-          gemini_model: '${{ vars.GEMINI_MODEL }}'
-          google_api_key: '${{ secrets.GOOGLE_API_KEY }}'
-          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
-          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
-          upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
-          workflow_name: 'gemini-review'
-          settings: |-
-            {
-              "model": {
-                "maxSessionTurns": 50
-              },
-              "telemetry": {
-                "enabled": true,
-                "target": "local",
-                "outfile": ".gemini/telemetry.log"
-              },
-              "mcpServers": {
-                "github": {
-                  "command": "docker",
-                  "args": [
-                    "run",
-                    "-i",
-                    "--rm",
-                    "-e",
-                    "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "ghcr.io/github/github-mcp-server:v0.27.0"
-                  ],
-                  "includeTools": [
-                    "add_comment_to_pending_review",
-                    "pull_request_read"
-                  ],
-                  "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
-                  }
-                }
-              },
-              "output": {
-                "format": "json"
-              },
-              "tools": {
-                "core": [
-                  "run_shell_command(cat)",
-                  "run_shell_command(echo)",
-                  "run_shell_command(grep)",
-                  "run_shell_command(head)",
-                  "run_shell_command(tail)"
-                ]
-              }
-            }
-          extensions: |
-            [
-              "https://github.com/VulcanToolkit/gemini-extension"
-            ]
-          prompt: '/vulcan-review-pr'
+    pr-review:
+        needs: start-review
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        if: ${{ inputs.requested_pr_review == 'true' }}
+        strategy:
+            matrix:
+                repetition: [1, 2, 3, 4, 5]
+        steps:
+            - name: Run Vulcan pull request review
+              id: vulcan-pr-review
+              uses: google-github-actions/run-gemini-cli@v0.1.21 # ratchet:exclude
+              env:
+                  GITHUB_TOKEN: ${{ needs.start-review.outputs.token || secrets.github-token || github.token }}
+                  ISSUE_TITLE: ${{ github.event.pull_request.title || github.event.issue.title }}
+                  ISSUE_BODY: ${{ github.event.pull_request.body || github.event.issue.body }}
+                  PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+                  REPOSITORY: ${{ github.repository }}
+                  ADDITIONAL_CONTEXT: ${{ inputs.additional_context }}
+                  GEMINI_API_KEY: ${{ secrets.gemini-api-key }}
+              with:
+                  gcp_location: ${{ vars.GOOGLE_CLOUD_LOCATION }}
+                  gcp_project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+                  gcp_service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
+                  gcp_workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+                  gemini_api_key: ${{ secrets.gemini-api-key }}
+                  gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
+                  gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
+                  gemini_model: ${{ vars.GEMINI_MODEL }}
+                  google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+                  use_gemini_code_assist: ${{ vars.GOOGLE_GENAI_USE_GCA }}
+                  use_vertex_ai: ${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}
+                  upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
+                  workflow_name: gemini-review
+                  settings: |-
+                      {
+                        "model": {
+                          "maxSessionTurns": 50
+                        },
+                        "telemetry": {
+                          "enabled": true,
+                          "target": "local",
+                          "outfile": ".gemini/telemetry.log"
+                        },
+                        "mcpServers": {
+                          "github": {
+                            "command": "docker",
+                            "args": [
+                              "run",
+                              "-i",
+                              "--rm",
+                              "-e",
+                              "GITHUB_PERSONAL_ACCESS_TOKEN",
+                              "ghcr.io/github/github-mcp-server:v0.27.0"
+                            ],
+                            "includeTools": [
+                              "add_comment_to_pending_review",
+                              "pull_request_read"
+                            ],
+                            "env": {
+                              "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                            }
+                          }
+                        },
+                        "output": {
+                          "format": "json"
+                        },
+                        "tools": {
+                          "core": [
+                            "run_shell_command(cat)",
+                            "run_shell_command(echo)",
+                            "run_shell_command(grep)",
+                            "run_shell_command(head)",
+                            "run_shell_command(tail)"
+                          ]
+                        }
+                      }
+                  extensions: |
+                      [
+                        "https://github.com/VulcanToolkit/gemini-extension"
+                      ]
+                  prompt: /vulcan-review-pr
 
-      - name: Save output
-        uses: actions/github-script@v9
-        id: save-outputs
-        env:
-          REPETITION: '${{ matrix.repetition }}'
-          GEMINI_OUTPUT: '${{ steps.vulcan-pr-review.outputs.summary }}'
-        with:
-          github-token: ${{ secrets.github-token }}
-          script: |
-            const fs = require('fs');
-            const content = process.env.GEMINI_OUTPUT;
-            fs.writeFileSync(`vulcan-pr-${process.env.REPETITION}.txt`, content);
+            - name: Save output
+              uses: actions/github-script@v9
+              id: save-outputs
+              env:
+                  REPETITION: ${{ matrix.repetition }}
+                  GEMINI_OUTPUT: ${{ steps.vulcan-pr-review.outputs.summary }}
+              with:
+                  github-token: ${{ secrets.github-token }}
+                  script: |
+                      const fs = require('fs');
+                      const content = process.env.GEMINI_OUTPUT;
+                      fs.writeFileSync(`vulcan-pr-${process.env.REPETITION}.txt`, content);
 
-      - name: Create review artifacts
-        id: upload-artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: vulcan-pr-${{ matrix.repetition }}
-          path: vulcan-pr-${{ matrix.repetition }}.txt
+            - name: Create review artifacts
+              id: upload-artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: vulcan-pr-${{ matrix.repetition }}
+                  path: vulcan-pr-${{ matrix.repetition }}.txt
 
-      - name: Post to report-generation service
-        env:
-          REPO_OWNER: "${{ github.repository_owner }}"
-          REPO_NAME: "${{ github.event.repository.name }}"
-          PULL_NUM: "${{ github.event.pull_request.number || github.event.issue.number }}"
-          RUN_ID: "${{ github.run_id }}"
-          ARTIFACT_ID: "${{ steps.upload-artifact.outputs.artifact-id }}"
-        run: |
-          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
-          curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
+            - name: Post to report-generation service
+              env:
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  REPO_NAME: ${{ github.event.repository.name }}
+                  PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
+                  RUN_ID: ${{ github.run_id }}
+                  ARTIFACT_ID: ${{ steps.upload-artifact.outputs.artifact-id }}
+              run: |
+                  args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
+                  curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
 
-  finish-pr-review:
-    needs: [start-review, pr-review]
-    runs-on: 'ubuntu-latest'
-    timeout-minutes: 30
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-      issues: 'write'
-      pull-requests: 'write'
-    outputs:
-      should-review-commits: ${{ steps.fetch-pr-report.outputs.should-review-commits }}
-    steps:
-      - name: Fetch PR review report
-        id: fetch-pr-report
-        env:
-          GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
-          REPOSITORY: '${{ github.repository }}'
-          PULL_NUM: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          REPO_OWNER: "${{ github.repository_owner }}"
-          REPO_NAME: "${{ github.event.repository.name }}"
-          RUN_ID: "${{ github.run_id }}"
-        run: |
-          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
-          report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_pr_report?$args")
-          gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
+    finish-pr-review:
+        needs: [start-review, pr-review]
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        permissions:
+            contents: read
+            id-token: write
+            issues: write
+            pull-requests: write
+        outputs:
+            should-review-commits: ${{ steps.fetch-pr-report.outputs.should-review-commits }}
+        steps:
+            - name: Fetch PR review report
+              id: fetch-pr-report
+              env:
+                  GITHUB_TOKEN: ${{ needs.start-review.outputs.token || secrets.github-token || github.token }}
+                  REPOSITORY: ${{ github.repository }}
+                  PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  REPO_NAME: ${{ github.event.repository.name }}
+                  RUN_ID: ${{ github.run_id }}
+              run: |
+                  args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
+                  report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_pr_report?$args")
+                  gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
 
-          if [[ "$report" == *"A review of the individual commits will be conducted."* ]]; then
-            echo "should-review-commits=true" >>$GITHUB_OUTPUT
-          else
-            echo "should-review-commits=false" >>$GITHUB_OUTPUT
-          fi
+                  if [[ "$report" == *"A review of the individual commits will be conducted."* ]]; then
+                    echo "should-review-commits=true" >>$GITHUB_OUTPUT
+                  else
+                    echo "should-review-commits=false" >>$GITHUB_OUTPUT
+                  fi
 
-  commit-review:
-    needs: [start-review, finish-pr-review]
-    if: |
-      always() && (inputs.requested_commit_review == 'true' || needs.finish-pr-review.outputs.should-review-commits == 'true')
-    runs-on: 'ubuntu-latest'
-    timeout-minutes: 30
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-      issues: 'write'
-      pull-requests: 'write'
-    strategy:
-      matrix:
-        commit: ${{ fromJson(needs.start-review.outputs.commit-hashes) }}
-        repetition: [1, 2, 3, 4, 5]
-    steps:
-      - name: Checkout repository
-        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8' # ratchet:actions/checkout@v6
-        with:
-          ref: '${{ matrix.commit }}'
+    commit-review:
+        needs: [start-review, finish-pr-review]
+        if: |
+            always() && (inputs.requested_commit_review == 'true' || needs.finish-pr-review.outputs.should-review-commits == 'true')
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        permissions:
+            contents: read
+            id-token: write
+            issues: write
+            pull-requests: write
+        strategy:
+            matrix:
+                commit: ${{ fromJson(needs.start-review.outputs.commit-hashes) }}
+                repetition: [1, 2, 3, 4, 5]
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # ratchet:actions/checkout@v6
+              with:
+                  ref: ${{ matrix.commit }}
 
-      - name: Run Vulcan commit review
-        id: vulcan-commit-review
-        uses: 'google-github-actions/run-gemini-cli@v0.1.21' # ratchet:exclude
-        env:
-          GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
-          COMMIT_MESSAGE: '${{ fromJson(needs.start-review.outputs.commits)[matrix.commit].commit.message }}'
-          COMMIT_SHA: '${{ matrix.commit }}'
-          REPOSITORY: '${{ github.repository }}'
-          ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
-          GEMINI_API_KEY: '${{ secrets.gemini-api-key }}'
-        with:
-          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
-          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
-          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          gemini_api_key: '${{ secrets.gemini-api-key }}'
-          gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
-          gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
-          gemini_model: '${{ vars.GEMINI_MODEL }}'
-          google_api_key: '${{ secrets.GOOGLE_API_KEY }}'
-          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
-          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
-          upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
-          workflow_name: 'gemini-review'
-          settings: |-
-            {
-              "model": {
-                "maxSessionTurns": 50
-              },
-              "telemetry": {
-                "enabled": true,
-                "target": "local",
-                "outfile": ".gemini/telemetry.log"
-              },
-              "mcpServers": {
-                "github": {
-                  "command": "docker",
-                  "args": [
-                    "run",
-                    "-i",
-                    "--rm",
-                    "-e",
-                    "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "ghcr.io/github/github-mcp-server:v0.27.0"
-                  ],
-                  "includeTools": [
-                  ],
-                  "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
-                  }
-                }
-              },
-              "output": {
-                "format": "json"
-              },
-              "tools": {
-                "core": [
-                  "run_shell_command(cat)",
-                  "run_shell_command(echo)",
-                  "run_shell_command(grep)",
-                  "run_shell_command(head)",
-                  "run_shell_command(tail)",
-                  "run_shell_command(git)"
-                ]
-              }
-            }
-          extensions: |
-            [
-              "https://github.com/VulcanToolkit/gemini-extension"
-            ]
-          prompt: '/vulcan-review-commit'
+            - name: Run Vulcan commit review
+              id: vulcan-commit-review
+              uses: google-github-actions/run-gemini-cli@v0.1.21 # ratchet:exclude
+              env:
+                  GITHUB_TOKEN: ${{ needs.start-review.outputs.token || secrets.github-token || github.token }}
+                  COMMIT_MESSAGE: ${{ fromJson(needs.start-review.outputs.commits)[matrix.commit].commit.message }}
+                  COMMIT_SHA: ${{ matrix.commit }}
+                  REPOSITORY: ${{ github.repository }}
+                  ADDITIONAL_CONTEXT: ${{ inputs.additional_context }}
+                  GEMINI_API_KEY: ${{ secrets.gemini-api-key }}
+              with:
+                  gcp_location: ${{ vars.GOOGLE_CLOUD_LOCATION }}
+                  gcp_project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+                  gcp_service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
+                  gcp_workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+                  gemini_api_key: ${{ secrets.gemini-api-key }}
+                  gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
+                  gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
+                  gemini_model: ${{ vars.GEMINI_MODEL }}
+                  google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+                  use_gemini_code_assist: ${{ vars.GOOGLE_GENAI_USE_GCA }}
+                  use_vertex_ai: ${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}
+                  upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
+                  workflow_name: gemini-review
+                  settings: |-
+                      {
+                        "model": {
+                          "maxSessionTurns": 50
+                        },
+                        "telemetry": {
+                          "enabled": true,
+                          "target": "local",
+                          "outfile": ".gemini/telemetry.log"
+                        },
+                        "mcpServers": {
+                          "github": {
+                            "command": "docker",
+                            "args": [
+                              "run",
+                              "-i",
+                              "--rm",
+                              "-e",
+                              "GITHUB_PERSONAL_ACCESS_TOKEN",
+                              "ghcr.io/github/github-mcp-server:v0.27.0"
+                            ],
+                            "includeTools": [
+                            ],
+                            "env": {
+                              "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                            }
+                          }
+                        },
+                        "output": {
+                          "format": "json"
+                        },
+                        "tools": {
+                          "core": [
+                            "run_shell_command(cat)",
+                            "run_shell_command(echo)",
+                            "run_shell_command(grep)",
+                            "run_shell_command(head)",
+                            "run_shell_command(tail)",
+                            "run_shell_command(git)"
+                          ]
+                        }
+                      }
+                  extensions: |
+                      [
+                        "https://github.com/VulcanToolkit/gemini-extension"
+                      ]
+                  prompt: /vulcan-review-commit
 
-      - name: Save output
-        uses: actions/github-script@v9
-        id: save-outputs
-        env:
-          COMMIT_SHA: '${{ matrix.commit }}'
-          REPETITION: '${{ matrix.repetition }}'
-          GEMINI_OUTPUT: '${{ steps.vulcan-commit-review.outputs.summary }}'
-        with:
-          github-token: ${{ secrets.github-token }}
-          script: |
-            const fs = require('fs');
-            const content = process.env.GEMINI_OUTPUT;
-            fs.writeFileSync(`vulcan-commit-${process.env.COMMIT_SHA}-${process.env.REPETITION}.txt`, content);
+            - name: Save output
+              uses: actions/github-script@v9
+              id: save-outputs
+              env:
+                  COMMIT_SHA: ${{ matrix.commit }}
+                  REPETITION: ${{ matrix.repetition }}
+                  GEMINI_OUTPUT: ${{ steps.vulcan-commit-review.outputs.summary }}
+              with:
+                  github-token: ${{ secrets.github-token }}
+                  script: |
+                      const fs = require('fs');
+                      const content = process.env.GEMINI_OUTPUT;
+                      fs.writeFileSync(`vulcan-commit-${process.env.COMMIT_SHA}-${process.env.REPETITION}.txt`, content);
 
-      - name: Create review artifacts
-        id: upload-artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}
-          path: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}.txt
+            - name: Create review artifacts
+              id: upload-artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}
+                  path: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}.txt
 
-      - name: Post to report-generation service
-        env:
-          REPO_OWNER: "${{ github.repository_owner }}"
-          REPO_NAME: "${{ github.event.repository.name }}"
-          PULL_NUM: "${{ github.event.pull_request.number || github.event.issue.number }}"
-          RUN_ID: "${{ github.run_id }}"
-          ARTIFACT_ID: "${{ steps.upload-artifact.outputs.artifact-id }}"
-        run: |
-          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
-          curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
+            - name: Post to report-generation service
+              env:
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  REPO_NAME: ${{ github.event.repository.name }}
+                  PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
+                  RUN_ID: ${{ github.run_id }}
+                  ARTIFACT_ID: ${{ steps.upload-artifact.outputs.artifact-id }}
+              run: |
+                  args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
+                  curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
 
-  finish-commit-review:
-    needs: [start-review, commit-review]
-    if: |
-      always() && (inputs.requested_commit_review == 'true' || needs.finish-pr-review.outputs.should-review-commits == 'true')
-    runs-on: 'ubuntu-latest'
-    timeout-minutes: 30
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-      issues: 'write'
-      pull-requests: 'write'
-    steps:
-      - name: Fetch commit review report
-        id: fetch-commit-report
-        env:
-          GITHUB_TOKEN: '${{ needs.start-review.outputs.token || secrets.github-token || github.token }}'
-          REPOSITORY: '${{ github.repository }}'
-          PULL_NUM: '${{ github.event.pull_request.number || github.event.issue.number }}'
-          REPO_OWNER: "${{ github.repository_owner }}"
-          REPO_NAME: "${{ github.event.repository.name }}"
-          RUN_ID: "${{ github.run_id }}"
-        run: |
-          args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
-          report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_commit_report?$args")
-          gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
+    finish-commit-review:
+        needs: [start-review, commit-review]
+        if: |
+            always() && (inputs.requested_commit_review == 'true' || needs.finish-pr-review.outputs.should-review-commits == 'true')
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        permissions:
+            contents: read
+            id-token: write
+            issues: write
+            pull-requests: write
+        steps:
+            - name: Fetch commit review report
+              id: fetch-commit-report
+              env:
+                  GITHUB_TOKEN: ${{ needs.start-review.outputs.token || secrets.github-token || github.token }}
+                  REPOSITORY: ${{ github.repository }}
+                  PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  REPO_NAME: ${{ github.event.repository.name }}
+                  RUN_ID: ${{ github.run_id }}
+              run: |
+                  args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
+                  report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_commit_report?$args")
+                  gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
