@@ -59,10 +59,10 @@ jobs:
                   permission-issues: write
                   permission-pull-requests: write
 
+            # This will checkout the base repository default branch, not the PR code.
+            # It is to be used for context during the code review.
             - name: Checkout repository
               uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-              with:
-                  ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/head
 
             - name: Get PR Commits
               id: get-pr-commits
@@ -245,10 +245,10 @@ jobs:
                 commit: ${{ fromJson(needs.start-review.outputs.commit-hashes) }}
                 repetition: [1, 2, 3, 4, 5]
         steps:
+            # This will checkout the base repository default branch, not the PR code.
+            # It is to be used for context during the code review.
             - name: Checkout repository
-              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # ratchet:actions/checkout@v6
-              with:
-                  ref: ${{ matrix.commit }}
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
 
             - name: Run Vulcan commit review
               id: vulcan-commit-review
