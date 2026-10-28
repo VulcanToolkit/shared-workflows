@@ -140,7 +140,6 @@ jobs:
                               "ghcr.io/github/github-mcp-server:v0.27.0"
                             ],
                             "includeTools": [
-                              "add_comment_to_pending_review",
                               "pull_request_read"
                             ],
                             "env": {
@@ -297,6 +296,7 @@ jobs:
                               "ghcr.io/github/github-mcp-server:v0.27.0"
                             ],
                             "includeTools": [
+                              "get_commit"
                             ],
                             "env": {
                               "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
