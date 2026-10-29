@@ -261,7 +261,7 @@ jobs:
                   const pr = await github.rest.pulls.get({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
-                    pull_number: context.issue.number
+                    pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
                   });
 
                   core.setOutput("owner", pr.head.repo.owner.login);
