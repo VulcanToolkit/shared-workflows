@@ -252,6 +252,22 @@ jobs:
                 commit: ${{ fromJson(needs.start-review.outputs.commit-hashes) }}
                 repetition: [1, 2, 3, 4, 5]
         steps:
+            # Get information about the head repository, necessary for comment-triggered reviews.
+            - name: Get PR Information
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # ratchet:actions/github-script@v9
+              id: get-pr-info
+              with:
+                script: |
+                  const pr = await github.rest.pulls.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.issue.number
+                  });
+
+                  core.setOutput("owner", pr.head.repo.owner.login);
+                  core.setOutput("name", pr.head.repo.name);
+                  core.setOutput("full_name", pr.head.repo.full_name);
+
             # This will checkout the base repository default branch, not the PR code.
             # It is to be used for context during the code review.
             - name: Checkout repository
@@ -264,11 +280,11 @@ jobs:
                   GITHUB_TOKEN: ${{ needs.start-review.outputs.token || secrets.github-token || github.token }}
                   COMMIT_MESSAGE: ${{ fromJson(needs.start-review.outputs.commits)[matrix.commit].commit.message }}
                   COMMIT_SHA: ${{ matrix.commit }}
-                  REPOSITORY: ${{ github.event.pull_request.head.repo.full_name || github.event.issue.pull_request.head.repo.full_name }}
+                  REPOSITORY: ${{ steps.get-pr-info.outputs.full_name }}
                   ADDITIONAL_CONTEXT: ${{ inputs.additional_context }}
                   GEMINI_API_KEY: ${{ secrets.gemini-api-key }}
-                  REPO_OWNER: ${{ github.event.pull_request.head.repo.owner.login || github.event.issue.pull_request.head.repo.owner.login }}
-                  REPO_NAME: ${{ github.event.pull_request.head.repo.name || github.event.issue.pull_request.head.repo.name }}
+                  REPO_OWNER: ${{ steps.get-pr-info.outputs.owner }}
+                  REPO_NAME: ${{ steps.get-pr-info.outputs.name }}
               with:
                   gcp_location: ${{ vars.GOOGLE_CLOUD_LOCATION }}
                   gcp_project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
