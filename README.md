@@ -15,25 +15,23 @@ Importantly, it requires the target repository to have defined the
 name: Vulcan Review
 
 on:
-  pull_request:
+  pull_request_target:
     types:
-      - 'opened'
+      - opened
+      - synchronize
 
 jobs:
   review:
     uses: VulcanToolkit/shared-workflows/.github/workflows/vulcan-review.yml@main
     permissions:
-      contents: 'read'
-      id-token: 'write'
-      issues: 'write'
-      pull-requests: 'write'
+      contents: read
+      pull-requests: write
     with:
       additional_context: ''
       requested_pr_review: 'true'
       requested_commit_review: 'false'
     secrets:
       gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
-      github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 More complicated integrations could use a dispatcher to call Vulcan with
