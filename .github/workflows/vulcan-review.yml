@@ -266,6 +266,9 @@ jobs:
                     pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
                   });
 
+                  core.info(JSON.stringify(context, null, 2));
+                  core.info(JSON.stringify(pr, null, 2));
+
                   core.setOutput("owner", pr.head.repo.owner.login);
                   core.setOutput("name", pr.head.repo.name);
                   core.setOutput("full_name", pr.head.repo.full_name);
