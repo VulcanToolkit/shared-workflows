@@ -143,7 +143,7 @@ jobs:
                               "GITHUB_READ_ONLY=1",
                               "-e",
                               "GITHUB_TOOLS",
-                              "ghcr.io/github/github-mcp-server:v0.27.0"
+                              "ghcr.io/github/github-mcp-server:v2.0.3"
                             ],
                             "includeTools": [
                               "pull_request_read"
@@ -257,18 +257,18 @@ jobs:
               uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # ratchet:actions/github-script@v9
               id: get-pr-info
               with:
-                github-token: ${{ secrets.github-token }}
-                result-encoding: string
-                script: |
-                  const pr = await github.rest.pulls.get({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
-                  });
+                  github-token: ${{ secrets.github-token }}
+                  result-encoding: string
+                  script: |
+                      const pr = await github.rest.pulls.get({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
+                      });
 
-                  core.setOutput("owner", pr.data.head.repo.owner.login);
-                  core.setOutput("name", pr.data.head.repo.name);
-                  core.setOutput("full_name", pr.data.head.repo.full_name);
+                      core.setOutput("owner", pr.data.head.repo.owner.login);
+                      core.setOutput("name", pr.data.head.repo.name);
+                      core.setOutput("full_name", pr.data.head.repo.full_name);
 
             # This will checkout the base repository default branch, not the PR code.
             # It is to be used for context during the code review.
@@ -324,7 +324,7 @@ jobs:
                               "GITHUB_READ_ONLY=1",
                               "-e",
                               "GITHUB_TOOLS",
-                              "ghcr.io/github/github-mcp-server:v0.27.0"
+                              "ghcr.io/github/github-mcp-server:v2.0.3"
                             ],
                             "includeTools": [
                               "get_commit"
@@ -359,7 +359,7 @@ jobs:
               uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # ratchet:actions/upload-artifact@v7
               with:
                   name: vulcan-commit-${{ matrix.commit }}-${{ matrix.repetition }}-telemetry
-                  path: '.gemini/telemetry.log'
+                  path: .gemini/telemetry.log
 
             - name: Save output
               uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # ratchet:actions/github-script@v9
