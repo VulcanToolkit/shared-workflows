@@ -266,12 +266,9 @@ jobs:
                     pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
                   });
 
-                  core.info(JSON.stringify(context, null, 2));
-                  core.info(JSON.stringify(pr, null, 2));
-
-                  core.setOutput("owner", pr.head.repo.owner.login);
-                  core.setOutput("name", pr.head.repo.name);
-                  core.setOutput("full_name", pr.head.repo.full_name);
+                  core.setOutput("owner", pr.data.head.repo.owner.login);
+                  core.setOutput("name", pr.data.head.repo.name);
+                  core.setOutput("full_name", pr.data.head.repo.full_name);
 
             # This will checkout the base repository default branch, not the PR code.
             # It is to be used for context during the code review.
