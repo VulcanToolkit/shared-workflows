@@ -257,6 +257,8 @@ jobs:
               uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # ratchet:actions/github-script@v9
               id: get-pr-info
               with:
+                github-token: ${{ secrets.github-token }}
+                result-encoding: string
                 script: |
                   const pr = await github.rest.pulls.get({
                     owner: context.repo.owner,
