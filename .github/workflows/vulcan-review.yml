@@ -69,6 +69,7 @@ jobs:
         if: ${{ inputs.requested_pr_review == 'true' }}
         permissions:
             contents: read
+            pull_requests: read
         strategy:
             matrix:
                 repetition: [1, 2, 3, 4, 5]
