@@ -165,7 +165,7 @@ jobs:
                               "GITHUB_READ_ONLY=1",
                               "-e",
                               "GITHUB_TOOLS",
-                              "ghcr.io/github/github-mcp-server:v2.0.3"
+                              "ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132" #v2.0.3
                             ],
                             "includeTools": [
                               "pull_request_read"
@@ -338,7 +338,7 @@ jobs:
                               "GITHUB_READ_ONLY=1",
                               "-e",
                               "GITHUB_TOOLS",
-                              "ghcr.io/github/github-mcp-server:v2.0.3"
+                              "ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132" #v2.0.3
                             ],
                             "includeTools": [
                               "get_commit"
