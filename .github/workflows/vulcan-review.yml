@@ -184,9 +184,9 @@ jobs:
                           "core": [
                             "activate_skill",
                             "glob",
-                            "grep_search"
+                            "grep_search",
                             "list_directory",
-                            "read_file",
+                            "read_file"
                           ]
                         }
                       }
@@ -358,9 +358,9 @@ jobs:
                           "core": [
                             "activate_skill",
                             "glob",
-                            "grep_search"
+                            "grep_search",
                             "list_directory",
-                            "read_file",
+                            "read_file"
                           ]
                         }
                       }
