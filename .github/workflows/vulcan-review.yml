@@ -64,17 +64,24 @@ jobs:
                   github-token: ${{ github.token }}
                   result-encoding: string
                   script: |
-                      const commits = await github.rest.pulls.listCommits({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
-                      });
+                      const params = {
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          pull_number: context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number,
+                      };
+
+                      // We are intentionally not handling pagination here to
+                      // limit the maximum number of reviewed commits.
+                      // This is necessary to avoid exceeding the 256 limit
+                      // on matrix strategy tasks (50 commits x 5 repetitions).
+                      // The generated report will alert the user to this limitation.
+                      const { data: commits } = await github.rest.pulls.listCommits({ ...params, per_page: 50 });
 
                       // List of hashes for the matrix strategy
-                      core.setOutput("commit-hashes", JSON.stringify(commits.data.map(x => x.sha)))
+                      core.setOutput("commit-hashes", JSON.stringify(commits.map(x => x.sha)))
 
                       // Map of hash to commit information for reporting
-                      const commit_map = Object.fromEntries(commits.data.map(x => [x.sha, x]));
+                      const commit_map = Object.fromEntries(commits.map(x => [x.sha, x]));
                       core.setOutput("commits", JSON.stringify(commit_map))
 
     pr-review:
