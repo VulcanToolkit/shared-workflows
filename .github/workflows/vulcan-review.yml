@@ -91,7 +91,7 @@ jobs:
         if: inputs.requested_pr_review == 'true'
         permissions:
             contents: read
-            pull_requests: read
+            pull-requests: read
         strategy:
             matrix:
                 repetition: [1, 2, 3, 4, 5]
@@ -189,7 +189,7 @@ jobs:
                           ]
                         }
                       }
-                  extensions: []
+                  extensions: '[]'
                   prompt: /vulcan-review-pr ${{ github.event.pull_request.number || github.event.issue.number }}
 
             - name: Save output
@@ -362,7 +362,7 @@ jobs:
                           ]
                         }
                       }
-                  extensions: []
+                  extensions: '[]'
                   prompt: /vulcan-review-commit ${{ matrix.commit }}
 
             - name: Save output
