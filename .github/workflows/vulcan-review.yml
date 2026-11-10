@@ -9,6 +9,11 @@ on:
                 type: string
                 description: Any additional context from the request
                 required: false
+            gemini_cli_version:
+                type: string
+                description: Version of the Gemini CLI to install
+                required: false
+                default: 0.38.1
             google_cloud_location:
                 type: string
                 description: Google Cloud location
@@ -106,6 +111,16 @@ jobs:
                       printf 'Additional context: %s\n' "$ADDITIONAL_CONTEXT" >>vulcan-context.md
                   fi
 
+            - name: Install Vulcan Gemini extension
+              env:
+                  GEMINI_CLI_VERSION: ${{ inputs.gemini_cli_version }}
+                  VULCAN_EXTENSION_SHA: aa23ce25d03c0195c6adb16d50044ab31a7b9a88
+              run: |
+                  npm install --global "@google/gemini-cli@$GEMINI_CLI_VERSION"
+                  gemini extensions install \
+                      https://github.com/VulcanToolkit/gemini-extension \
+                      --ref "$VULCAN_EXTENSION_SHA" --consent --skip-settings
+
             - name: Run Vulcan pull request review
               id: vulcan-pr-review
               uses: google-github-actions/run-gemini-cli@9dbec29a20fab3f35017a40ad0eb798a257d4d51 # ratchet:google-github-actions/run-gemini-cli@v0.1.21
@@ -114,7 +129,7 @@ jobs:
               with:
                   gcp_location: ${{ inputs.google_cloud_location }}
                   gcp_project_id: ${{ inputs.google_cloud_project }}
-                  gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
+                  gemini_cli_version: ${{ inputs.gemini_cli_version }}
                   gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
                   gemini_model: ${{ vars.GEMINI_MODEL }}
                   google_api_key: ${{ secrets.google-api-key }}
@@ -167,10 +182,7 @@ jobs:
                           ]
                         }
                       }
-                  extensions: |
-                      [
-                        "https://github.com/VulcanToolkit/gemini-extension"
-                      ]
+                  extensions: []
                   prompt: /vulcan-review-pr ${{ github.event.pull_request.number || github.event.issue.number }}
 
             - name: Save output
@@ -271,6 +283,16 @@ jobs:
                       printf 'Additional context: %s\n' "$ADDITIONAL_CONTEXT" >>vulcan-context.md
                   fi
 
+            - name: Install Vulcan Gemini extension
+              env:
+                  GEMINI_CLI_VERSION: ${{ inputs.gemini_cli_version }}
+                  VULCAN_EXTENSION_SHA: aa23ce25d03c0195c6adb16d50044ab31a7b9a88
+              run: |
+                  npm install --global "@google/gemini-cli@$GEMINI_CLI_VERSION"
+                  gemini extensions install \
+                      https://github.com/VulcanToolkit/gemini-extension \
+                      --ref "$VULCAN_EXTENSION_SHA" --consent --skip-settings
+
             - name: Run Vulcan commit review
               id: vulcan-commit-review
               uses: google-github-actions/run-gemini-cli@9dbec29a20fab3f35017a40ad0eb798a257d4d51 # ratchet:google-github-actions/run-gemini-cli@v0.1.21
@@ -279,7 +301,7 @@ jobs:
               with:
                   gcp_location: ${{ inputs.google_cloud_location }}
                   gcp_project_id: ${{ inputs.google_cloud_project }}
-                  gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
+                  gemini_cli_version: ${{ inputs.gemini_cli_version }}
                   gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
                   gemini_model: ${{ vars.GEMINI_MODEL }}
                   google_api_key: ${{ secrets.google-api-key }}
@@ -332,10 +354,7 @@ jobs:
                           ]
                         }
                       }
-                  extensions: |
-                      [
-                        "https://github.com/VulcanToolkit/gemini-extension"
-                      ]
+                  extensions: []
                   prompt: /vulcan-review-commit ${{ matrix.commit }}
 
             - name: Save output
