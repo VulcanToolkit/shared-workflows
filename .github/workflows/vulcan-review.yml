@@ -9,6 +9,16 @@ on:
                 type: string
                 description: Any additional context from the request
                 required: false
+            google_cloud_location:
+                type: string
+                description: Google Cloud location
+                required: false
+                default: us-central1
+            google_cloud_project:
+                type: string
+                description: Google Cloud project ID
+                required: false
+                default: sinclair-nsfsafeose25-57a9
             requested_pr_review:
                 type: string
                 description: Whether a pull request review was requested ('true' or 'false')
@@ -20,7 +30,7 @@ on:
                 required: false
                 default: 'false'
         secrets:
-            gemini-api-key:
+            google-api-key:
                 required: true
 
 concurrency:
@@ -92,22 +102,16 @@ jobs:
               id: vulcan-pr-review
               uses: google-github-actions/run-gemini-cli@9dbec29a20fab3f35017a40ad0eb798a257d4d51 # ratchet:google-github-actions/run-gemini-cli@v0.1.21
               env:
-                  GEMINI_API_KEY: ${{ secrets.gemini-api-key }}
                   GITHUB_TOKEN: ${{ github.token }}
               with:
-                  gcp_location: ${{ vars.GOOGLE_CLOUD_LOCATION }}
-                  gcp_project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
-                  gcp_service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
-                  gcp_workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-                  gemini_api_key: ${{ secrets.gemini-api-key }}
+                  gcp_location: ${{ inputs.google_cloud_location }}
+                  gcp_project_id: ${{ inputs.google_cloud_project }}
                   gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
                   gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
                   gemini_model: ${{ vars.GEMINI_MODEL }}
-                  google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-                  use_gemini_code_assist: ${{ vars.GOOGLE_GENAI_USE_GCA }}
-                  use_vertex_ai: ${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}
+                  google_api_key: ${{ secrets.google-api-key }}
+                  use_vertex_ai: true
                   upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
-                  workflow_name: gemini-review
                   settings: |-
                       {
                         "model": {
@@ -182,14 +186,16 @@ jobs:
 
             - name: Post to report-generation service
               env:
-                  REPO_OWNER: ${{ github.repository_owner }}
-                  REPO_NAME: ${{ github.event.repository.name }}
-                  PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
-                  RUN_ID: ${{ github.run_id }}
                   ARTIFACT_ID: ${{ steps.upload-artifact.outputs.artifact-id }}
+                  GCP_LOCATION: ${{ inputs.google_cloud_location }}
+                  GCP_PROJECT_ID: ${{ inputs.google_cloud_project }}
+                  PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
+                  REPO_NAME: ${{ github.event.repository.name }}
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
-                  curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
+                  curl -X POST "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/load_artifact?$args"
 
     finish-pr-review:
         needs: [start-review, pr-review]
@@ -203,15 +209,17 @@ jobs:
             - name: Fetch PR review report
               id: fetch-pr-report
               env:
+                  GCP_LOCATION: ${{ inputs.google_cloud_location }}
+                  GCP_PROJECT_ID: ${{ inputs.google_cloud_project }}
                   GITHUB_TOKEN: ${{ github.token }}
-                  REPOSITORY: ${{ github.repository }}
                   PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
-                  REPO_OWNER: ${{ github.repository_owner }}
                   REPO_NAME: ${{ github.event.repository.name }}
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  REPOSITORY: ${{ github.repository }}
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
-                  report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_pr_report?$args")
+                  report=$(curl "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/make_pr_report?$args")
                   gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
 
                   if [[ "$report" == *"A review of the individual commits will be conducted."* ]]; then
@@ -251,22 +259,16 @@ jobs:
               id: vulcan-commit-review
               uses: google-github-actions/run-gemini-cli@9dbec29a20fab3f35017a40ad0eb798a257d4d51 # ratchet:google-github-actions/run-gemini-cli@v0.1.21
               env:
-                  GEMINI_API_KEY: ${{ secrets.gemini-api-key }}
                   GITHUB_TOKEN: ${{ github.token }}
               with:
-                  gcp_location: ${{ vars.GOOGLE_CLOUD_LOCATION }}
-                  gcp_project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
-                  gcp_service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
-                  gcp_workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-                  gemini_api_key: ${{ secrets.gemini-api-key }}
+                  gcp_location: ${{ inputs.google_cloud_location }}
+                  gcp_project_id: ${{ inputs.google_cloud_project }}
                   gemini_cli_version: ${{ vars.GEMINI_CLI_VERSION || '0.38.1' }}
                   gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
                   gemini_model: ${{ vars.GEMINI_MODEL }}
-                  google_api_key: ${{ secrets.GOOGLE_API_KEY }}
-                  use_gemini_code_assist: ${{ vars.GOOGLE_GENAI_USE_GCA }}
-                  use_vertex_ai: ${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}
+                  google_api_key: ${{ secrets.google-api-key }}
+                  use_vertex_ai: true
                   upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
-                  workflow_name: gemini-review
                   settings: |-
                       {
                         "model": {
@@ -342,14 +344,16 @@ jobs:
 
             - name: Post to report-generation service
               env:
-                  REPO_OWNER: ${{ github.repository_owner }}
-                  REPO_NAME: ${{ github.event.repository.name }}
-                  PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
-                  RUN_ID: ${{ github.run_id }}
                   ARTIFACT_ID: ${{ steps.upload-artifact.outputs.artifact-id }}
+                  GCP_LOCATION: ${{ inputs.google_cloud_location }}
+                  GCP_PROJECT_ID: ${{ inputs.google_cloud_project }}
+                  PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
+                  REPO_NAME: ${{ github.event.repository.name }}
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
-                  curl -X POST "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/load_artifact?$args"
+                  curl -X POST "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/load_artifact?$args"
 
     finish-commit-review:
         needs: [start-review, commit-review]
@@ -363,13 +367,15 @@ jobs:
             - name: Fetch commit review report
               id: fetch-commit-report
               env:
+                  GCP_LOCATION: ${{ inputs.google_cloud_location }}
+                  GCP_PROJECT_ID: ${{ inputs.google_cloud_project }}
                   GITHUB_TOKEN: ${{ github.token }}
-                  REPOSITORY: ${{ github.repository }}
                   PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
-                  REPO_OWNER: ${{ github.repository_owner }}
                   REPO_NAME: ${{ github.event.repository.name }}
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  REPOSITORY: ${{ github.repository }}
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
-                  report=$(curl "https://us-central1-sinclair-nsfsafeose25-57a9.cloudfunctions.net/make_commit_report?$args")
+                  report=$(curl "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/make_commit_report?$args")
                   gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
