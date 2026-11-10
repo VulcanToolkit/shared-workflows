@@ -91,12 +91,20 @@ jobs:
 
             - name: Write context file
               shell: bash
+              env:
+                  ADDITIONAL_CONTEXT: ${{ inputs.additional_context }}
+                  REPO_NAME: ${{ github.event.repository.name }}
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  REPOSITORY: ${{ github.repository }}
               run: |
-                  echo "Repository: ${{ github.repository }}" >vulcan-context.md
-                  echo "Repository owner: ${{ github.repository_owner }}" >>vulcan-context.md
-                  echo "Repository name: ${{ github.event.repository.name }}" >>vulcan-context.md
-                  echo "Additional context: ${{ inputs.additional_context }}" >>vulcan-context.md
-                  cat vulcan-context.md
+                  {
+                      printf 'Repository: %s\n' "$REPOSITORY"
+                      printf 'Repository owner: %s\n' "$REPO_OWNER"
+                      printf 'Repository name: %s\n' "$REPO_NAME"
+                  } > vulcan-context.md
+                  if [ -n "$ADDITIONAL_CONTEXT" ]; then
+                      printf 'Additional context: %s\n' "$ADDITIONAL_CONTEXT" >>vulcan-context.md
+                  fi
 
             - name: Run Vulcan pull request review
               id: vulcan-pr-review
@@ -248,12 +256,20 @@ jobs:
 
             - name: Write context file
               shell: bash
+              env:
+                  ADDITIONAL_CONTEXT: ${{ inputs.additional_context }}
+                  REPO_NAME: ${{ github.event.repository.name }}
+                  REPO_OWNER: ${{ github.repository_owner }}
+                  REPOSITORY: ${{ github.repository }}
               run: |
-                  echo "Repository: ${{ github.repository }}" >vulcan-context.md
-                  echo "Repository owner: ${{ github.repository_owner }}" >>vulcan-context.md
-                  echo "Repository name: ${{ github.event.repository.name }}" >>vulcan-context.md
-                  echo "Additional context: ${{ inputs.additional_context }}" >>vulcan-context.md
-                  cat vulcan-context.md
+                  {
+                      printf 'Repository: %s\n' "$REPOSITORY"
+                      printf 'Repository owner: %s\n' "$REPO_OWNER"
+                      printf 'Repository name: %s\n' "$REPO_NAME"
+                  } > vulcan-context.md
+                  if [ -n "$ADDITIONAL_CONTEXT" ]; then
+                      printf 'Additional context: %s\n' "$ADDITIONAL_CONTEXT" >>vulcan-context.md
+                  fi
 
             - name: Run Vulcan commit review
               id: vulcan-commit-review
