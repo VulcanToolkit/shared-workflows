@@ -266,6 +266,9 @@ jobs:
         permissions:
             contents: read
         strategy:
+            # Commit review may start up to 250 jobs. Set a limit to avoid
+            # exceeding API rate limits.
+            max-parallel: 5
             matrix:
                 commit: ${{ fromJson(needs.start-review.outputs.commit-hashes) }}
                 repetition: [1, 2, 3, 4, 5]
