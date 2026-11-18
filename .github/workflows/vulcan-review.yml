@@ -150,8 +150,8 @@ jobs:
                   gemini_cli_version: ${{ inputs.gemini_cli_version }}
                   gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
                   gemini_model: ${{ inputs.gemini_model }}
-                  gemini_api_key: ${{ inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
-                  google_api_key: ${{ !inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
+                  gemini_api_key: ${{ !inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
+                  google_api_key: ${{ inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
                   use_vertex_ai: ${{ inputs.use_vertex_ai }}
                   upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
                   # ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132 = v2.0.3
@@ -325,8 +325,8 @@ jobs:
                   gemini_cli_version: ${{ inputs.gemini_cli_version }}
                   gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
                   gemini_model: ${{ inputs.gemini_model }}
-                  gemini_api_key: ${{ inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
-                  google_api_key: ${{ !inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
+                  gemini_api_key: ${{ !inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
+                  google_api_key: ${{ inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
                   use_vertex_ai: ${{ inputs.use_vertex_ai }}
                   upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
                   # ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132 = v2.0.3
