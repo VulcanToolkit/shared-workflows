@@ -9,6 +9,11 @@ on:
                 type: string
                 description: Any additional context from the request
                 required: false
+            gemini_model:
+                type: string
+                description: Gemini model name
+                required: false
+                default: gemini-3.8-flash
             gemini_cli_version:
                 type: string
                 description: Version of the Gemini CLI to install
@@ -25,17 +30,22 @@ on:
                 required: false
                 default: sinclair-nsfsafeose25-57a9
             requested_pr_review:
-                type: string
-                description: Whether a pull request review was requested ('true' or 'false')
+                type: boolean
+                description: Whether a pull request review was requested
                 required: false
-                default: 'true'
+                default: true
             requested_commit_review:
-                type: string
-                description: Whether a commit review was requested ('true' or 'false')
+                type: boolean
+                description: Whether a commit review was requested
                 required: false
-                default: 'false'
+                default: false
+            use_vertex_ai:
+                type: boolean
+                description: Switch between Gemini API and Vertex AI API
+                required: false
+                default: false
         secrets:
-            google-api-key:
+            gemini_api_key:
                 required: true
 
 concurrency:
@@ -88,12 +98,12 @@ jobs:
         needs: start-review
         runs-on: ubuntu-latest
         timeout-minutes: 30
-        if: inputs.requested_pr_review == 'true'
+        if: inputs.requested_pr_review
         permissions:
             contents: read
             pull-requests: read
         strategy:
-            max-parallel: 2
+            max-parallel: 5
             matrix:
                 repetition: [1, 2, 3, 4, 5]
         steps:
@@ -139,9 +149,10 @@ jobs:
                   gcp_project_id: ${{ inputs.google_cloud_project }}
                   gemini_cli_version: ${{ inputs.gemini_cli_version }}
                   gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
-                  gemini_model: ${{ vars.GEMINI_MODEL }}
-                  google_api_key: ${{ secrets.google-api-key }}
-                  use_vertex_ai: true
+                  gemini_model: ${{ inputs.gemini_model }}
+                  gemini_api_key: ${{ inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
+                  google_api_key: ${{ !inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
+                  use_vertex_ai: ${{ inputs.use_vertex_ai }}
                   upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
                   # ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132 = v2.0.3
                   settings: |-
@@ -170,11 +181,12 @@ jobs:
                               "ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"
                             ],
                             "includeTools": [
+                              "get_file_contents",
                               "pull_request_read"
                             ],
                             "env": {
                               "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}",
-                              "GITHUB_TOOLS": "pull_request_read"
+                              "GITHUB_TOOLS": "get_file_contents,pull_request_read"
                             }
                           }
                         },
@@ -183,11 +195,7 @@ jobs:
                         },
                         "tools": {
                           "core": [
-                            "activate_skill",
-                            "glob",
-                            "grep_search",
-                            "list_directory",
-                            "read_file"
+                            "activate_skill"
                           ]
                         }
                       }
@@ -261,7 +269,7 @@ jobs:
         needs: [start-review, finish-pr-review]
         if: >-
             always() && !cancelled() &&
-            (inputs.requested_commit_review == 'true' || needs.finish-pr-review.outputs.should-review-commits == 'true')
+            (inputs.requested_commit_review || needs.finish-pr-review.outputs.should-review-commits == 'true')
         runs-on: ubuntu-latest
         timeout-minutes: 30
         permissions:
@@ -269,7 +277,7 @@ jobs:
         strategy:
             # Commit review may start up to 250 jobs. Set a limit to avoid
             # exceeding API rate limits.
-            max-parallel: 2
+            max-parallel: 5
             matrix:
                 commit: ${{ fromJson(needs.start-review.outputs.commit-hashes) }}
                 repetition: [1, 2, 3, 4, 5]
@@ -316,9 +324,10 @@ jobs:
                   gcp_project_id: ${{ inputs.google_cloud_project }}
                   gemini_cli_version: ${{ inputs.gemini_cli_version }}
                   gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
-                  gemini_model: ${{ vars.GEMINI_MODEL }}
-                  google_api_key: ${{ secrets.google-api-key }}
-                  use_vertex_ai: true
+                  gemini_model: ${{ inputs.gemini_model }}
+                  gemini_api_key: ${{ inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
+                  google_api_key: ${{ !inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
+                  use_vertex_ai: ${{ inputs.use_vertex_ai }}
                   upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
                   # ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132 = v2.0.3
                   settings: |-
@@ -347,11 +356,12 @@ jobs:
                               "ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"
                             ],
                             "includeTools": [
-                              "get_commit"
+                              "get_commit",
+                              "get_file_contents"
                             ],
                             "env": {
                               "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}",
-                              "GITHUB_TOOLS": "get_commit"
+                              "GITHUB_TOOLS": "get_commit,get_file_contents"
                             }
                           }
                         },
@@ -360,11 +370,7 @@ jobs:
                         },
                         "tools": {
                           "core": [
-                            "activate_skill",
-                            "glob",
-                            "grep_search",
-                            "list_directory",
-                            "read_file"
+                            "activate_skill"
                           ]
                         }
                       }
@@ -408,7 +414,7 @@ jobs:
         needs: [start-review, finish-pr-review, commit-review]
         if: >-
             always() && !cancelled() &&
-            (inputs.requested_commit_review == 'true' || needs.finish-pr-review.outputs.should-review-commits == 'true')
+            (inputs.requested_commit_review || needs.finish-pr-review.outputs.should-review-commits == 'true')
         runs-on: ubuntu-latest
         timeout-minutes: 30
         permissions:
