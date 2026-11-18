@@ -232,7 +232,7 @@ jobs:
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
-                  curl -X POST "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/load_artifact?$args"
+                  curl -X POST --no-progress-meter --show-headers "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/load_artifact?$args"
 
     finish-pr-review:
         needs: [start-review, pr-review]
@@ -256,7 +256,7 @@ jobs:
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
-                  report=$(curl "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/make_pr_report?$args")
+                  report=$(curl --no-progress-meter "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/make_pr_report?$args")
                   gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
 
                   if [[ "$report" == *"A review of the individual commits will be conducted."* ]]; then
@@ -408,7 +408,7 @@ jobs:
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
-                  curl -X POST "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/load_artifact?$args"
+                  curl -X POST --no-progress-meter --show-headers "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/load_artifact?$args"
 
     finish-commit-review:
         needs: [start-review, finish-pr-review, commit-review]
@@ -433,5 +433,5 @@ jobs:
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
-                  report=$(curl "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/make_commit_report?$args")
+                  report=$(curl --no-progress-meter "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/make_commit_report?$args")
                   gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
