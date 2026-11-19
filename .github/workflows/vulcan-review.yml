@@ -9,26 +9,6 @@ on:
                 type: string
                 description: Any additional context from the request
                 required: false
-            gemini_model:
-                type: string
-                description: Gemini model name
-                required: false
-                default: gemini-3.8-flash
-            gemini_cli_version:
-                type: string
-                description: Version of the Gemini CLI to install
-                required: false
-                default: 0.38.1
-            google_cloud_location:
-                type: string
-                description: Google Cloud location
-                required: false
-                default: us-central1
-            google_cloud_project:
-                type: string
-                description: Google Cloud project ID
-                required: false
-                default: sinclair-nsfsafeose25-57a9
             requested_pr_review:
                 type: boolean
                 description: Whether a pull request review was requested
@@ -37,11 +17,6 @@ on:
             requested_commit_review:
                 type: boolean
                 description: Whether a commit review was requested
-                required: false
-                default: false
-            use_vertex_ai:
-                type: boolean
-                description: Switch between Gemini API and Vertex AI API
                 required: false
                 default: false
         secrets:
@@ -59,6 +34,13 @@ defaults:
 env:
     CURL_GET_OPTIONS: --no-progress-meter
     CURL_POST_OPTIONS: --no-progress-meter --retry 5 --retry-delay 15 --show-headers
+    GEMINI_CLI_VERSION: ${{ vars.VULCAN_GEMINI_CLI_VERSION || '0.38.1' }}
+    GEMINI_MODEL: ${{ vars.VULCAN_GEMINI_MODEL || 'gemini-3.8-flash' }}
+    GITHUB_MCP_SERVER_IMAGE: ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132 #v2.0.3
+    GOOGLE_CLOUD_LOCATION: ${{ vars.VULCAN_GOOGLE_CLOUD_LOCATION || 'us-central1' }}
+    GOOGLE_CLOUD_PROJECT: ${{ vars.VULCAN_GOOGLE_CLOUD_PROJECT || 'sinclair-nsfsafeose25-57a9' }}
+    USE_VERTEX_AI: ${{ vars.VULCAN_USE_VERTEX_AI == 'true' }}
+    VULCAN_EXTENSION_SHA: aa23ce25d03c0195c6adb16d50044ab31a7b9a88
 
 jobs:
     start-review:
@@ -134,9 +116,6 @@ jobs:
                   fi
 
             - name: Install Vulcan Gemini extension
-              env:
-                  GEMINI_CLI_VERSION: ${{ inputs.gemini_cli_version }}
-                  VULCAN_EXTENSION_SHA: aa23ce25d03c0195c6adb16d50044ab31a7b9a88
               run: |
                   npm install --global "@google/gemini-cli@$GEMINI_CLI_VERSION"
                   gemini extensions install \
@@ -149,16 +128,15 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ github.token }}
               with:
-                  gcp_location: ${{ inputs.google_cloud_location }}
-                  gcp_project_id: ${{ inputs.google_cloud_project }}
-                  gemini_cli_version: ${{ inputs.gemini_cli_version }}
-                  gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
-                  gemini_model: ${{ inputs.gemini_model }}
-                  gemini_api_key: ${{ !inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
-                  google_api_key: ${{ inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
-                  use_vertex_ai: ${{ inputs.use_vertex_ai }}
-                  upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
-                  # ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132 = v2.0.3
+                  gcp_location: ${{ env.GOOGLE_CLOUD_LOCATION }}
+                  gcp_project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
+                  gemini_cli_version: ${{ env.GEMINI_CLI_VERSION }}
+                  gemini_debug: false
+                  gemini_model: ${{ env.GEMINI_MODEL }}
+                  gemini_api_key: ${{ env.USE_VERTEX_AI != 'true' && secrets.gemini_api_key || '' }}
+                  google_api_key: ${{ env.USE_VERTEX_AI == 'true' && secrets.gemini_api_key || '' }}
+                  use_vertex_ai: ${{ env.USE_VERTEX_AI == 'true' }}
+                  upload_artifacts: false
                   settings: |-
                       {
                         "model": {
@@ -182,7 +160,7 @@ jobs:
                               "GITHUB_READ_ONLY=1",
                               "-e",
                               "GITHUB_TOOLS",
-                              "ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"
+                              "${GITHUB_MCP_SERVER_IMAGE}"
                             ],
                             "includeTools": [
                               "get_file_contents",
@@ -228,15 +206,13 @@ jobs:
             - name: Post to report-generation service
               env:
                   ARTIFACT_ID: ${{ steps.upload-artifact.outputs.artifact-id }}
-                  GCP_LOCATION: ${{ inputs.google_cloud_location }}
-                  GCP_PROJECT_ID: ${{ inputs.google_cloud_project }}
                   PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
                   REPO_NAME: ${{ github.event.repository.name }}
                   REPO_OWNER: ${{ github.repository_owner }}
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
-                  curl -X POST $CURL_POST_OPTIONS "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/load_artifact?$args"
+                  curl -X POST $CURL_POST_OPTIONS "https://$GOOGLE_CLOUD_LOCATION-$GOOGLE_CLOUD_PROJECT.cloudfunctions.net/load_artifact?$args"
 
     finish-pr-review:
         needs: [start-review, pr-review]
@@ -250,8 +226,6 @@ jobs:
             - name: Fetch PR review report
               id: fetch-pr-report
               env:
-                  GCP_LOCATION: ${{ inputs.google_cloud_location }}
-                  GCP_PROJECT_ID: ${{ inputs.google_cloud_project }}
                   GITHUB_TOKEN: ${{ github.token }}
                   PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
                   REPO_NAME: ${{ github.event.repository.name }}
@@ -260,7 +234,7 @@ jobs:
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
-                  report=$(curl $CURL_GET_OPTIONS "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/make_pr_report?$args")
+                  report=$(curl $CURL_GET_OPTIONS "https://$GOOGLE_CLOUD_LOCATION-$GOOGLE_CLOUD_PROJECT.cloudfunctions.net/make_pr_report?$args")
                   gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
 
                   if [[ "$report" == *"A review of the individual commits will be conducted."* ]]; then
@@ -309,9 +283,6 @@ jobs:
                   fi
 
             - name: Install Vulcan Gemini extension
-              env:
-                  GEMINI_CLI_VERSION: ${{ inputs.gemini_cli_version }}
-                  VULCAN_EXTENSION_SHA: aa23ce25d03c0195c6adb16d50044ab31a7b9a88
               run: |
                   npm install --global "@google/gemini-cli@$GEMINI_CLI_VERSION"
                   gemini extensions install \
@@ -324,16 +295,15 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ github.token }}
               with:
-                  gcp_location: ${{ inputs.google_cloud_location }}
-                  gcp_project_id: ${{ inputs.google_cloud_project }}
-                  gemini_cli_version: ${{ inputs.gemini_cli_version }}
-                  gemini_debug: ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
-                  gemini_model: ${{ inputs.gemini_model }}
-                  gemini_api_key: ${{ !inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
-                  google_api_key: ${{ inputs.use_vertex_ai && secrets.gemini_api_key || '' }}
-                  use_vertex_ai: ${{ inputs.use_vertex_ai }}
-                  upload_artifacts: ${{ vars.UPLOAD_ARTIFACTS }}
-                  # ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132 = v2.0.3
+                  gcp_location: ${{ env.GOOGLE_CLOUD_LOCATION }}
+                  gcp_project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
+                  gemini_cli_version: ${{ env.GEMINI_CLI_VERSION }}
+                  gemini_debug: false
+                  gemini_model: ${{ env.GEMINI_MODEL }}
+                  gemini_api_key: ${{ env.USE_VERTEX_AI != 'true' && secrets.gemini_api_key || '' }}
+                  google_api_key: ${{ env.USE_VERTEX_AI == 'true' && secrets.gemini_api_key || '' }}
+                  use_vertex_ai: ${{ env.USE_VERTEX_AI == 'true' }}
+                  upload_artifacts: false
                   settings: |-
                       {
                         "model": {
@@ -357,7 +327,7 @@ jobs:
                               "GITHUB_READ_ONLY=1",
                               "-e",
                               "GITHUB_TOOLS",
-                              "ghcr.io/github/github-mcp-server@sha256:250bc6ce70788207608ef74cef4397230ff2e8481218da74d6093e4bd9101132"
+                              "${GITHUB_MCP_SERVER_IMAGE}"
                             ],
                             "includeTools": [
                               "get_commit",
@@ -404,15 +374,13 @@ jobs:
             - name: Post to report-generation service
               env:
                   ARTIFACT_ID: ${{ steps.upload-artifact.outputs.artifact-id }}
-                  GCP_LOCATION: ${{ inputs.google_cloud_location }}
-                  GCP_PROJECT_ID: ${{ inputs.google_cloud_project }}
                   PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
                   REPO_NAME: ${{ github.event.repository.name }}
                   REPO_OWNER: ${{ github.repository_owner }}
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID&artifact_id=$ARTIFACT_ID"
-                  curl -X POST $CURL_POST_OPTIONS "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/load_artifact?$args"
+                  curl -X POST $CURL_POST_OPTIONS "https://$GOOGLE_CLOUD_LOCATION-$GOOGLE_CLOUD_PROJECT.cloudfunctions.net/load_artifact?$args"
 
     finish-commit-review:
         needs: [start-review, finish-pr-review, commit-review]
@@ -427,8 +395,6 @@ jobs:
             - name: Fetch commit review report
               id: fetch-commit-report
               env:
-                  GCP_LOCATION: ${{ inputs.google_cloud_location }}
-                  GCP_PROJECT_ID: ${{ inputs.google_cloud_project }}
                   GITHUB_TOKEN: ${{ github.token }}
                   PULL_NUM: ${{ github.event.pull_request.number || github.event.issue.number }}
                   REPO_NAME: ${{ github.event.repository.name }}
@@ -437,5 +403,5 @@ jobs:
                   RUN_ID: ${{ github.run_id }}
               run: |
                   args="repo_owner=$REPO_OWNER&repo_name=$REPO_NAME&pull_num=$PULL_NUM&run_id=$RUN_ID"
-                  report=$(curl $CURL_GET_OPTIONS "https://$GCP_LOCATION-$GCP_PROJECT_ID.cloudfunctions.net/make_commit_report?$args")
+                  report=$(curl $CURL_GET_OPTIONS "https://$GOOGLE_CLOUD_LOCATION-$GOOGLE_CLOUD_PROJECT.cloudfunctions.net/make_commit_report?$args")
                   gh issue comment "$PULL_NUM" --repo "$REPOSITORY" --body "$report"
